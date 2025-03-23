@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affichage JSON</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css"> <!-- Lien vers le fichier CSS externe -->
+</head>
+
+<body>
+    <div class="container">
+        <h1>Utilisateurs</h1>
+        <div class="form-group">
+            <label for="jsonInput">Collez votre JSON ici:</label>
+            <textarea class="form-control" id="jsonInput" rows="5"></textarea>
+        </div>
+        <button id="displayJsonButton" class="btn btn-primary">Afficher JSON</button>
+        <div id="jsonError" class="alert alert-danger" style="display:none;"></div>
+        <div id="user-list">
+            <!-- Les utilisateurs seront insérés ici par JavaScript -->
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th onclick="sortByUser()">Utilisateur</th>
+                        <th onclick="sortByFiliere()">Filière</th>
+                        <th onclick="sortByFlags()">Flags</th>
+                    </tr>
+                </thead>
+                <tbody id="user-table-body">
+                    <!-- Les utilisateurs seront insérés ici par JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="script.js"></script> <!-- Lien vers le fichier JavaScript externe -->
+    <div id="userDetails" style="display:none;">
+        <!-- Détails de l'utilisateur seront affichés ici -->
+    </div>
+</body>
+
+</html>
