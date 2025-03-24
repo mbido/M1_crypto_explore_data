@@ -1,10 +1,72 @@
 import requests
 import json
 import time
+import os
 import sys
 import subprocess
 import time
 import json
+import dotenv
+
+
+def jprint(json_content):
+    print(json.dumps(json_content, indent=2))
+
+
+class OpensslError(Exception):
+    pass
+
+
+def int_to_bytes(n):
+    return n.to_bytes(n.bit_length() // 8 + 1)
+
+
+def encrypt(plaintext, passphrase, cipher="aes-128-cbc"):
+    pass_arg = "pass:{}".format(passphrase)
+    args = ["openssl", "enc", "-" + cipher, "-base64", "-pass", pass_arg, "-pbkdf2"]
+    if not plaintext.endswith("\n"):
+        plaintext += "\n"
+
+    if isinstance(plaintext, str):
+        plaintext = plaintext.encode("utf-8")
+    result = subprocess.run(
+        args, input=plaintext, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    error_message = result.stderr.decode()
+    if error_message != "":
+        raise OpensslError(error_message)
+    return result.stdout.decode()
+
+
+def decrypt(cryptedtext, passphrase, cipher="aes-128-cbc"):
+
+    if not cryptedtext.endswith("\n"):
+        cryptedtext += "\n"
+
+    pass_arg = "pass:{}".format(passphrase)
+    args = [
+        "openssl",
+        "enc",
+        "-d",
+        "-" + cipher,
+        "-base64",
+        "-pass",
+        pass_arg,
+        "-pbkdf2",
+    ]
+
+    if isinstance(cryptedtext, str):
+        cryptedtext = cryptedtext.encode()
+
+    result = subprocess.run(
+        args, input=cryptedtext, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+
+    error_message = result.stderr.decode()
+    if error_message != "":
+        raise OpensslError(error_message)
+
+    return result.stdout.decode()
 
 
 def jprint(json_content):
@@ -70,7 +132,8 @@ def decrypt(cryptedtext, passphrase, cipher="aes-128-cbc"):
 API_URL = "http://m1.tme-crypto.fr:8888/"
 HEADERS = {"Content-Type": "application/json"}
 DEFAULT_USERNAME = "mbidault"
-DEFAULT_PWD = int_to_bytes(365416338768477987679790).decode()
+dotenv.load_dotenv()
+DEFAULT_PWD = os.getenv("DEFAULT_PWD")
 
 KERBERIZED_METHODS = [
     "world.create",
@@ -258,31 +321,46 @@ def scan_users(client: KerberosClient, verbose=1):
     return result
 
 
-def scan_active_users(client: KerberosClient, verbose=1):
-    users_list = []
+def scan_active_users(
+    client: KerberosClient, verbose=1, protected=False, show_duplicate=False
+):
+    users_dict = {}  # Dictionary to store best record for each user
     world_list = client.list_worlds()
     result = []
+
     for w in world_list:
         w_ID = w[0]
         user = client.use_from_world(w_ID)
-        if not user or user in users_list:
+        if not user:
             continue
-        users_list.append(user)
-        if verbose > 0:
-            print(user, file=sys.stderr)
+
         location = client.location(w_ID)
         room = client.room_name(w_ID, location)
         data = client.data_collection(w_ID)
-        # print((user, room, data))
-        result.append(
-            {
-                "user": user,
-                "world_id": w_ID,
-                "location": location,
-                "room": room,
-                "data": data,
-            }
-        )
+        if protected:
+            data["email"] = "N/A"
+
+        record = {
+            "user": user,
+            "world_id": w_ID,
+            "location": location,
+            "room": room,
+            "data": data,
+        }
+
+        if show_duplicate:
+            result.append(record)
+        else:
+
+            if user not in users_dict or len(data) > len(users_dict[user]["data"]):
+                users_dict[user] = record
+
+        if verbose > 0:
+            print(user, file=sys.stderr)
+
+    if not show_duplicate:
+        result = list(users_dict.values())
+
     return result
 
 
@@ -304,5 +382,5 @@ K_CLIENT = KerberosClient()
 
 # jprint(K_CLIENT.use_from_world("c89e87be37e427e86e9720fc6329bd6f"))
 # all_man(K_CLIENT)
-scan = scan_active_users(K_CLIENT)
+scan = scan_active_users(K_CLIENT, verbose=1)
 jprint(scan)
