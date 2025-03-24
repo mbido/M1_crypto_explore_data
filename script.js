@@ -1,8 +1,17 @@
 let userData = [];
 
-// ****************************************************
-//  FIN DE L'EMPLACEMENT DU JSON
-// ****************************************************
+function saveUserDataToLocalStorage(data) {
+  localStorage.setItem('userData', JSON.stringify(data));
+}
+
+function loadUserDataFromLocalStorage() {
+  const storedData = localStorage.getItem('userData');
+  if (storedData) {
+    return JSON.parse(storedData);
+  }
+  return null;
+}
+
 let currentSortCriteria = null;
 function createUserCard(user) {
   // Création de la div principale user-card
@@ -77,6 +86,7 @@ function displayUsers(dataToSort) {
 
   dataToSort.forEach(user => {
     const row = document.createElement('tr');
+    row.dataset.worldId = user.world_id;  // Ajouter world_id comme dataset
     const userNameCell = document.createElement('td');
     userNameCell.textContent = user.user;
     const flagsCountCell = document.createElement('td');
@@ -118,8 +128,9 @@ function displayUsers(dataToSort) {
 
 
         // Récupérer l'utilisateur correspondant à cette ligne
-        const selectedUser =
-            dataToSort.find(user => user.user === userNameCell.textContent);
+        const selectedUser = dataToSort.find(
+            u => u.user === userNameCell.textContent &&
+                u.world_id === row.dataset.worldId);
         if (selectedUser) {
           // alert(JSON.stringify(selectedUser, null, 2)); // Afficher les
           // détails (pour test)
@@ -131,8 +142,7 @@ function displayUsers(dataToSort) {
 
             // Créer un titre pour les détails
             const detailTitle = document.createElement('h3');
-            detailTitle.textContent =
-                `Utilisateur: ${selectedUser.user}`;  // Renommage du titre
+            detailTitle.textContent = `Utilisateur: ${selectedUser.user}`;
             userDetailsDiv.appendChild(detailTitle);
 
             // Créer un conteneur pour les sections en deux colonnes
@@ -225,13 +235,16 @@ function displayUsers(dataToSort) {
   });
 }
 
-
-// Appel initial pour afficher les utilisateurs au chargement du DOM
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM loaded');
+  // Charger les données depuis le localStorage au chargement de la page
+  const storedUserData = loadUserDataFromLocalStorage();
+  if (storedUserData) {
+    userData = storedUserData;
+  }
+
   displayUsers(userData);
 });
-
 
 document.getElementById('displayJsonButton')
     .addEventListener('click', function() {
@@ -241,7 +254,8 @@ document.getElementById('displayJsonButton')
         const parsedJson = JSON.parse(jsonInput);
         userData = parsedJson;
         displayUsers(userData);
-        jsonErrorDiv.style.display = 'none';  // Masquer les erreurs précédentes
+        jsonErrorDiv.style.display = 'none';
+        saveUserDataToLocalStorage(userData);
       } catch (e) {
         jsonErrorDiv.textContent = 'JSON invalide: ' + e.message;
         jsonErrorDiv.style.display = 'block';  // Afficher le message d'erreur
@@ -262,6 +276,7 @@ function sortByUser() {
     return 0;
   });
   displayUsers(userData);
+  saveUserDataToLocalStorage(userData);
 }
 
 function sortByFiliere() {
@@ -279,6 +294,7 @@ function sortByFiliere() {
     return 0;
   });
   displayUsers(userData);
+  saveUserDataToLocalStorage(userData);
 }
 
 function sortByFlags() {
@@ -294,4 +310,5 @@ function sortByFlags() {
     return 0;
   });
   displayUsers(userData);
+  saveUserDataToLocalStorage(userData);
 }
