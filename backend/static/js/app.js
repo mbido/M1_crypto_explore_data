@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Variables pour l'état du tri ---
   let currentSortKey = 'username';   // Clé de tri par défaut
   let currentSortDirection = 'asc';  // Direction par défaut
-  let currentUsersData = [];  // Pour stocker les données utilisateur actuelles
+  let currentUsersData =
+      [];  // Pour stocker les données utilisateur actuelles pour le tri
 
   // --- Gestion du Mode Sombre ---
   const applyDarkMode = (isDark) => {
@@ -47,7 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Fonction générique pour récupérer les données de l'API ---
   async function fetchData(url) {
-    showLoading();
+    // Ne pas montrer le loader global ici si on en montre un spécifique (ex:
+    // compare) showLoading(); // Remplacé par des loaders plus spécifiques si
+    // besoin
     try {
       const response = await fetch(`${API_BASE_URL}${url}`);
       if (!response.ok) {
@@ -58,17 +61,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return await response.json();
     } catch (error) {
       console.error('Erreur lors de la récupération des données:', error);
-      content.innerHTML =
+      content.innerHTML =  // Display error in main content area if fetch fails
+                           // significantly
           `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
               <strong class="font-bold">Erreur!</strong>
               <span class="block sm:inline"> ${error.message}</span>
            </div>`;
+      hideLoading();  // Ensure loader is hidden even on fetch error
       return null;
     } finally {
-      // Hide loading is often called within the rendering function after data
-      // processing, but ensure it's hidden if fetchData itself fails before
-      // rendering. Let the specific render function call hideLoading() upon
-      // completion.
+      // hideLoading() is called by individual render functions or error
+      // handlers
     }
   }
 
@@ -138,16 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!iconSpan) return;
 
       const key = th.getAttribute('data-sort-key');
-      iconSpan.classList.remove(
-          'fa-sort', 'fa-sort-up',
-          'fa-sort-down');  // Nettoyer les icônes précédentes
+      // Use specific classes, removing general 'fas' if needed, adding it back
+      // if icon shown
+      iconSpan.classList.remove('fa-sort', 'fa-sort-up', 'fa-sort-down');
+      iconSpan.classList.add(
+          'fas');  // Ensure fas is always there if an icon should show
 
       if (key === activeKey) {
         iconSpan.classList.add(
             direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
       } else {
-        iconSpan.classList.add(
-            'fa-sort');  // Icône par défaut pour les non triés
+        iconSpan.classList.add('fa-sort');  // Default icon
       }
     });
   }
@@ -175,34 +179,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Gestion basique des types (à améliorer si nécessaire pour
       // null/undefined etc.)
-      const type = typeof valA;
+      const typeA = typeof valA;
+      const typeB = typeof valB;  // Check both types in case of mixed data
 
       // Traitement des null/undefined ou N/A comme "inférieur" ou vide
-      if (valA === null || valA === undefined || valA === 'N/A')
-        valA = (type === 'number' ? -Infinity : '');
-      if (valB === null || valB === undefined || valB === 'N/A')
-        valB = (type === 'number' ? -Infinity : '');
+      // Consistent handling ensures they group together
+      let isANullish = valA === null || valA === undefined || valA === 'N/A';
+      let isBNullish = valB === null || valB === undefined || valB === 'N/A';
 
+      if (isANullish && isBNullish) return 0;  // Both nullish, treat as equal
+      if (isANullish)
+        return newDirection === 'asc' ? -1 :
+                                        1;  // A is nullish, comes first in asc
+      if (isBNullish)
+        return newDirection === 'asc' ? 1 :
+                                        -1;  // B is nullish, comes first in asc
 
+      // Now compare non-nullish values
       let comparison = 0;
-      if (type === 'string') {
-        comparison = (valA || '')
-                         .toLowerCase()
-                         .localeCompare((valB || '').toLowerCase());
-      } else if (type === 'number') {
-        comparison = (valA || 0) - (valB || 0);
-      } else if (type === 'boolean') {
+      if (typeA === 'string' ||
+          typeB === 'string') {  // If either is string, compare as strings
+        comparison = String(valA).toLowerCase().localeCompare(
+            String(valB).toLowerCase());
+      } else if (typeA === 'number' || typeB === 'number') {  // If either is
+                                                              // number, compare
+                                                              // as numbers
+        comparison = Number(valA) - Number(valB);
+      } else if (typeA === 'boolean' || typeB === 'boolean') {  // If either is
+                                                                // boolean
         // false < true
         comparison = (valA === valB) ? 0 : (valA ? 1 : -1);
-      } else if (key === 'blocked') {         // Handle null boolean case
+      } else if (key === 'blocked') {  // Handle null boolean case explicitly
         const blockedA = a.blocked === true;  // Convert null/undefined to false
         const blockedB = b.blocked === true;
         comparison = (blockedA === blockedB) ?
             0 :
-            (blockedA ? 1 : -1);  // Blocked sorts later in asc
+            (blockedA ? 1 : -1);  // Blocked (true) sorts later in asc
       }
 
-
+      // Apply direction (comparison already handles non-nullish)
       return newDirection === 'asc' ? comparison : comparison * -1;
     });
 
@@ -222,14 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Génère le HTML de la liste des utilisateurs (initial)
   function renderUserList(users) {
     // Stocke les données pour le tri ultérieur
-    currentUsersData = [
-      ...users
-    ];  // Crée une copie pour éviter de modifier l'original si besoin ailleurs
-    // Tri initial (si nécessaire, par défaut c'est déjà par username via API)
-    // sortUsers(currentSortKey); // Décommentez si vous voulez un tri initial
-    // client différent de l'API
+    currentUsersData =
+        [...users];  // Crée une copie pour éviter de modifier l'original
 
-    const tableBodyHtml = generateUserTableRows(currentUsersData);
+    // Appliquer le tri actuel (important si on revient sur la page)
+    // Tri par défaut est username asc (soit par API, soit par état initial)
+    sortUsers(currentSortKey);  // Applique le tri en cours ou initial
+    // Note: La ligne ci-dessus va aussi générer le HTML via
+    // generateUserTableRows et l'insérer.
+    const tableBodyHtml =
+        generateUserTableRows(currentUsersData);  // Génère le HTML trié
 
     content.innerHTML = `
             <h1 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Liste des Utilisateurs</h1>
@@ -274,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
       th.addEventListener('click', () => {
         const key = th.getAttribute('data-sort-key');
         if (key) {
-          sortUsers(key);
+          sortUsers(key);  // This will re-render the tbody and update icons
         }
       });
     });
@@ -286,8 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('userSearch');
     searchInput.addEventListener('input', (e) => {
       const searchTerm = e.target.value.toLowerCase();
-      // La recherche se fait sur les lignes actuellement dans le DOM.
-      // Si le tri est appliqué, la recherche filtrera les lignes triées.
       const tableRows = document.querySelectorAll('#userTableBody tr');
       tableRows.forEach(row => {
         const username = row.cells[0].textContent.toLowerCase();
@@ -311,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(
                 flag => `
             <span class="flag-tag inline-block bg-gray-200 dark:bg-lightest-navy rounded-full px-3 py-1 text-sm font-semibold text-gray-700 dark:text-light-slate mr-2 mb-2 cursor-default" title="Date: ${
-                    flag.date || 'N/A'}">
+                    formatDate(flag.date) || 'N/A'}">
                 ${flag.flag}
             </span>
         `).join('') :
@@ -348,7 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
         details.profile ?? 'N/A'}</p>
                     <p><strong class="text-gray-600 dark:text-slate">Bloqué:</strong>
                         ${
-        details.blocked ?
+        details.blocked === null || details.blocked === undefined ?
+            '<span class="text-gray-500 italic">N/A</span>' :
+            details.blocked ?
             '<span class="text-red-500 font-semibold">Oui</span>' :
             '<span class="text-green-500 font-semibold">Non</span>'}
                     </p>
@@ -392,82 +409,215 @@ document.addEventListener('DOMContentLoaded', () => {
         tag.style.display = isVisible ? 'inline-block' : 'none';
         if (isVisible) anyVisible = true;
       });
+      // Show 'no result' only if search term is not empty and nothing is
+      // visible
       noResultMessage.classList.toggle('hidden', anyVisible || !searchTerm);
     });
     hideLoading();  // Masquer le loader
   }
 
-  // Génère le HTML du formulaire de comparaison
+  // Génère le HTML du formulaire de comparaison (avec dropdowns recherchables)
   function renderCompareForm(users) {
-    const userOptions =
-        users
-            .sort(
-                (a, b) => a.username.localeCompare(
-                    b.username))  // Trie la liste pour les selects
-            .map(
-                user => `<option value="${user.username}">${
-                    user.username}</option>`)
-            .join('');
-    content.innerHTML = `
-            <h1 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Comparer les Flags (Bases)</h1>
-            <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow mb-6">
-                <form id="compareForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div>
-                        <label for="user1Select" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">Utilisateur 1</label>
-                        <select id="user1Select" name="user1" required class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white">
-                            <option value="">Choisir...</option>
-                            ${userOptions}
-                        </select>
-                    </div>
-                     <div>
-                        <label for="user2Select" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">Utilisateur 2</label>
-                        <select id="user2Select" name="user2" required class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white">
-                             <option value="">Choisir...</option>
-                            ${userOptions}
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 md:bg-green md:hover:opacity-90 text-white md:text-navy font-bold py-2 px-4 rounded h-10">
-                        Comparer
-                    </button>
-                </form>
-            </div>
-            <div id="compareResult" class="mt-6"></div>
-        `;
+    // Store users data for filtering, sorted for initial display perhaps
+    const availableUsers =
+        [...users].sort((a, b) => a.username.localeCompare(b.username));
 
-    // Ajoute l'écouteur pour la soumission du formulaire
+    // Structure HTML - Replaced <select> with input + dropdown div
+    content.innerHTML = `
+        <h1 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Comparer les Flags (Bases)</h1>
+        <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow mb-6">
+            <form id="compareForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <!-- User 1 Selector -->
+                <div class="relative">
+                    <label for="user1Input" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">Utilisateur 1</label>
+                    <input type="text" id="user1Input" placeholder="Rechercher utilisateur..." autocomplete="off"
+                           class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white focus:outline-none focus:ring-2 focus:ring-green focus:border-transparent">
+                    <input type="hidden" name="user1" id="user1Value">
+                    <div id="user1Dropdown" class="user-dropdown absolute z-20 w-full bg-white dark:bg-lightest-navy border border-gray-300 dark:border-slate rounded mt-1 max-h-60 overflow-y-auto hidden shadow-lg">
+                        <!-- Options will be populated here -->
+                    </div>
+                </div>
+
+                <!-- User 2 Selector -->
+                <div class="relative">
+                    <label for="user2Input" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">Utilisateur 2</label>
+                    <input type="text" id="user2Input" placeholder="Rechercher utilisateur..." autocomplete="off"
+                           class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white focus:outline-none focus:ring-2 focus:ring-green focus:border-transparent">
+                    <input type="hidden" name="user2" id="user2Value">
+                    <div id="user2Dropdown" class="user-dropdown absolute z-20 w-full bg-white dark:bg-lightest-navy border border-gray-300 dark:border-slate rounded mt-1 max-h-60 overflow-y-auto hidden shadow-lg">
+                        <!-- Options will be populated here -->
+                    </div>
+                </div>
+
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 md:bg-green md:hover:opacity-90 text-white md:text-navy font-bold py-2 px-4 rounded h-10">
+                    Comparer
+                </button>
+            </form>
+        </div>
+        <div id="compareResult" class="mt-6"></div>
+    `;
+
+    // --- Logic for Searchable Dropdowns ---
+    function setupSearchableDropdown(inputId, dropdownId, valueId) {
+      const inputElement = document.getElementById(inputId);
+      const dropdownElement = document.getElementById(dropdownId);
+      const valueElement = document.getElementById(valueId);
+      let blurTimeout;  // To handle click vs blur race condition
+
+      // Function to render dropdown options
+      const renderOptions = (filterTerm = '') => {
+        const lowerFilterTerm = filterTerm.toLowerCase();
+        // Filter based on username containing the filter term
+        const filteredUsers = availableUsers.filter(
+            user => user.username.toLowerCase().includes(lowerFilterTerm));
+
+        if (filteredUsers.length === 0 &&
+            filterTerm) {  // Show 'not found' only if searching
+          dropdownElement.innerHTML =
+              `<div class="p-2 text-sm text-gray-500 dark:text-slate italic">Aucun utilisateur trouvé</div>`;
+        } else if (filteredUsers.length === 0 && !filterTerm) {  // Show all if
+                                                                 // input is
+                                                                 // empty
+          dropdownElement.innerHTML = availableUsers
+                                          .map(
+                                              user => `
+            <div class="dropdown-item p-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-navy" data-value="${
+                                                  user.username}">
+              ${user.username}
+            </div>
+          `).join('');
+        } else {  // Show filtered results
+          dropdownElement.innerHTML = filteredUsers
+                                          .map(
+                                              user => `
+            <div class="dropdown-item p-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-navy" data-value="${
+                                                  user.username}">
+              ${user.username}
+            </div>
+          `).join('');
+        }
+        dropdownElement.classList.remove('hidden');
+      };
+
+      // Event Listener: Input typing
+      inputElement.addEventListener('input', () => {
+        valueElement.value =
+            '';  // Clear hidden value if user types manually (selection needed)
+        renderOptions(inputElement.value);
+      });
+
+      // Event Listener: Focus on input
+      inputElement.addEventListener('focus', () => {
+        clearTimeout(blurTimeout);  // Cancel pending blur hide
+        renderOptions(
+            inputElement
+                .value);  // Show dropdown, potentially filtered or full list
+      });
+
+      // Event Listener: Blur from input (hide dropdown with delay)
+      inputElement.addEventListener('blur', () => {
+        // Delay hiding to allow click event on dropdown items to register
+        blurTimeout = setTimeout(() => {
+          dropdownElement.classList.add('hidden');
+          // Optional: Validate if the text input matches the hidden value after
+          // blur
+          if (inputElement.value !== valueElement.value) {
+            // If user typed something but didn't select, revert to selected
+            // value or clear
+            inputElement.value =
+                valueElement.value;  // Revert to last valid selection
+          }
+        }, 200);  // 200ms delay feels about right
+      });
+
+      // Event Listener: Click on a dropdown item (using delegation on
+      // mousedown)
+      dropdownElement.addEventListener('mousedown', (e) => {
+        // Use mousedown to register before blur potentially hides the dropdown
+        const item =
+            e.target.closest('.dropdown-item');  // Find the item even if click
+                                                 // is on child element
+        if (item) {
+          const selectedValue = item.getAttribute('data-value');
+          inputElement.value = selectedValue;  // Update visible input
+          valueElement.value =
+              selectedValue;  // Update hidden input (used for form submission)
+          dropdownElement.classList.add('hidden');  // Hide dropdown
+          clearTimeout(
+              blurTimeout);     // Prevent the blur timeout from hiding again
+          inputElement.blur();  // Optionally remove focus after selection
+        }
+      });
+
+      // Initialize dropdown content (show all initially on focus)
+      // renderOptions(); // Optionally pre-populate on render, but focus
+      // handles it
+    }
+
+    // Setup for both dropdowns
+    setupSearchableDropdown('user1Input', 'user1Dropdown', 'user1Value');
+    setupSearchableDropdown('user2Input', 'user2Dropdown', 'user2Value');
+
+    // Add event listener for form submission (reads from hidden inputs)
     document.getElementById('compareForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const user1 = document.getElementById('user1Select').value;
-      const user2 = document.getElementById('user2Select').value;
+      // Read values from the hidden inputs now
+      const user1 = document.getElementById('user1Value').value;
+      const user2 = document.getElementById('user2Value').value;
       const resultDiv = document.getElementById('compareResult');
       resultDiv.innerHTML = '';  // Clear previous results
 
-      if (user1 && user2 && user1 !== user2) {
-        resultDiv.innerHTML =
-            '<div class="loader"></div>';  // Show spinner for comparison fetch
-        const data = await fetchData(`/compare?user1=${user1}&user2=${
-            user2}`);  // fetchData shows its own loader, maybe redundant
-        if (data) {
-          renderCompareResult(data);
-        } else {
-          // Error handled by fetchData, but provide context here
-          resultDiv.innerHTML =
-              '<p class="text-red-500">Erreur lors de la récupération de la comparaison.</p>';
-        }
-      } else if (user1 === user2 && user1 !== '') {
-        resultDiv.innerHTML =
-            '<p class="text-yellow-600 dark:text-yellow-400">Veuillez sélectionner deux utilisateurs différents.</p>';
-      } else {
+      // --- Validation ---
+      if (!user1 || !user2) {
         resultDiv.innerHTML =
             '<p class="text-yellow-600 dark:text-yellow-400">Veuillez sélectionner deux utilisateurs.</p>';
+        return;
+      }
+      if (user1 === user2) {
+        resultDiv.innerHTML =
+            '<p class="text-yellow-600 dark:text-yellow-400">Veuillez sélectionner deux utilisateurs différents.</p>';
+        return;
+      }
+
+      // Check if selected values are valid users (they should be if selected
+      // via dropdown) This is a safety check in case something went wrong.
+      const user1Exists = availableUsers.some(u => u.username === user1);
+      const user2Exists = availableUsers.some(u => u.username === user2);
+
+      if (!user1Exists || !user2Exists) {
+        // This case should ideally not happen if selection logic is correct
+        resultDiv.innerHTML =
+            '<p class="text-red-500">Erreur interne: Un ou les deux utilisateurs sélectionnés sont invalides.</p>';
+        return;
+      }
+
+      // --- Proceed with comparison API call ---
+      resultDiv.innerHTML =
+          '<div class="loader my-4"></div>';  // Show specific loader for
+                                              // comparison result area
+      // Don't show the main content loader via fetchData if we show a local one
+      const data = await fetchData(`/compare?user1=${
+          encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`);
+      if (data) {
+        renderCompareResult(data);  // Renders the results, replaces the loader
+      } else {
+        // Error message is already shown by fetchData in the main content.
+        // Clear the local loader/result area in case of fetch error.
+        resultDiv.innerHTML =
+            '<p class="text-red-500">Erreur lors de la récupération de la comparaison. Voir message ci-dessus.</p>';
       }
     });
-    hideLoading();  // Masquer le loader après avoir rendu le formulaire initial
+
+    hideLoading();  // Hide global loader after form is rendered and setup
   }
+
 
   // Génère le HTML pour afficher les résultats de la comparaison
   function renderCompareResult(data) {
-    const resultDiv = document.getElementById('compareResult');
+    const resultDiv = document.getElementById(
+        'compareResult');    // Should exist from renderCompareForm
+    if (!resultDiv) return;  // Safety check
+
     const renderList = (title, count, items) => `
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-gray-700 dark:text-light-slate mb-2">${
@@ -501,8 +651,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
-    // hideLoading() should be called by the caller of renderCompareResult if
-    // needed
+    // No need to call hideLoading() here, it was handled by the caller or
+    // fetchData
   }
 
   // --- Helper pour formater les dates ISO en format lisible ---
@@ -511,12 +661,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'N/A';  // Handle explicit N/A
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return dateString;
-      return date.toLocaleDateString('fr-FR') + ' ' +
+      if (isNaN(date.getTime()))
+        return dateString;  // Return original if invalid date
+      // Format to DD/MM/YYYY HH:MM
+      return date.toLocaleDateString(
+                 'fr-FR', {day: '2-digit', month: '2-digit', year: 'numeric'}) +
+          ' ' +
           date.toLocaleTimeString(
               'fr-FR', {hour: '2-digit', minute: '2-digit'});
     } catch (e) {
-      return dateString;
+      console.error('Error formatting date:', dateString, e);
+      return dateString;  // Fallback to original string on error
     }
   }
 
@@ -524,16 +679,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleRouteChange() {
     const hash = window.location.hash || '#dashboard';
     setActiveLink(hash);
-    showLoading();  // Show loader before any fetch/render
+    showLoading();  // Show global loader before any fetch/render
 
     // Réinitialise l'état du tri quand on quitte/revient à la page users
     if (hash !== '#users' && !hash.startsWith('#user/')) {
-      currentSortKey =
-          'username';  // Reset sort state if navigating away from user list
+      currentSortKey = 'username';  // Reset sort state if navigating away from
+                                    // user list/detail
       currentSortDirection = 'asc';
-      currentUsersData = [];  // Clear cached user data
+      // currentUsersData = []; // Clear cached user data only if necessary,
+      // might speed up return
     }
-
 
     try {
       if (hash === '#dashboard') {
@@ -543,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else
           hideLoading();  // Hide if fetch failed
       } else if (hash === '#users') {
-        // Reset sort when explicitly navigating to #users
+        // Explicitly set default sort when navigating TO #users
         currentSortKey = 'username';
         currentSortDirection = 'asc';
         const data =
@@ -562,34 +717,38 @@ document.addEventListener('DOMContentLoaded', () => {
         else
           hideLoading();  // Hide if fetch failed
       } else if (hash === '#compare') {
-        const users = await fetchData('/users');  // Fetch users for dropdowns
+        // Fetch users needed for the dropdowns
+        const users = await fetchData('/users');
         if (users) {
           renderCompareForm(
               users);  // This function now calls hideLoading internally
         } else {
-          content.innerHTML =
-              '<p class="text-red-500">Impossible de charger la liste des utilisateurs pour la comparaison.</p>';
-          hideLoading();  // Hide if fetch failed
+          // Error already shown by fetchData, just make sure loader is hidden
+          hideLoading();
+          // Optionally add context: content.innerHTML += '<p
+          // class="text-red-500">Impossible de charger les utilisateurs pour la
+          // comparaison.</p>';
         }
       } else {
+        // Handle unknown hash
         content.innerHTML =
             `<h1 class="text-xl">Page non trouvée</h1><p>Le lien ${
                 hash} ne correspond à aucune section.</p>`;
         hideLoading();  // Hide for unknown route
       }
     } catch (error) {
-      // Error should ideally be caught and displayed by fetchData, but catch
-      // here as a fallback
-      console.error('Erreur pendant le changement de route:', error);
+      // Catch unexpected errors during routing/rendering process
+      console.error('Erreur inattendue pendant le changement de route:', error);
       if (!content.querySelector(
-              '.bg-red-100')) {  // Avoid duplicate error messages
+              '.bg-red-100')) {  // Avoid duplicate error messages if fetchData
+                                 // already showed one
         content.innerHTML =
             `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
               <strong class="font-bold">Erreur!</strong>
-              <span class="block sm:inline"> Une erreur s'est produite lors du chargement de la page.</span>
+              <span class="block sm:inline"> Une erreur système s'est produite lors du chargement de la page.</span>
              </div>`;
       }
-      hideLoading();  // Ensure loader is hidden on error
+      hideLoading();  // Ensure loader is hidden on any error
     }
   }
 
@@ -599,17 +758,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const linkHref = link.getAttribute('href');
       let isActive = false;
       try {
-        // Handle cases like #users and #user/some_user matching the Users link
+        // Special case: Make "Utilisateurs" link active when viewing a specific
+        // user detail page
         if (hash.startsWith('#user/') && linkHref === '#users') {
           isActive = true;
         } else {
+          // Standard comparison, decode both for safety with special chars in
+          // usernames
           isActive = decodeURIComponent(linkHref) === decodeURIComponent(hash);
         }
       } catch (e) {
+        // Fallback if decoding fails (unlikely)
         isActive = linkHref === hash;
+        console.warn(
+            'Failed to decode URI component for link comparison:', linkHref,
+            hash, e);
       }
 
       link.classList.toggle('active', isActive);
+      // Apply visual styles based on active state and dark mode
       link.classList.toggle(
           'bg-gray-200',
           isActive && !document.documentElement.classList.contains('dark'));
@@ -617,10 +784,26 @@ document.addEventListener('DOMContentLoaded', () => {
           'dark:bg-lightest-navy',
           isActive && document.documentElement.classList.contains('dark'));
       link.classList.toggle('font-semibold', isActive);
+      link.classList.toggle(
+          'text-gray-900',
+          isActive &&
+              !document.documentElement.classList.contains(
+                  'dark'));  // Ensure active text color in light mode
+      link.classList.toggle(
+          'dark:text-green',
+          isActive &&
+              document.documentElement.classList.contains(
+                  'dark'));  // Ensure active text color in dark mode
+                             // Reset non-active styles explicitly if needed,
+                             // though Tailwind's base usually handles this
+      if (!isActive) {
+        link.classList.remove('text-gray-900', 'dark:text-green');
+      }
     });
   }
 
   // --- Chargement Initial et Écouteurs d'Événements ---
   window.addEventListener('hashchange', handleRouteChange);
   handleRouteChange();  // Load initial content based on current hash or default
+                        // #dashboard
 });
