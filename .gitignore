@@ -1,2 +1,5 @@
 .env
 *.json
+db/*
+*temp*
+__pycache__

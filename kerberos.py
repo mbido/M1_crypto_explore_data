@@ -139,6 +139,8 @@ KERBERIZED_METHODS = [
     "world.create",
     "kerberos.echo",
     "protagonist.move",
+    "item.move",
+    "room.neighbor",
 ]
 
 NON_KERBERIZED_METHODS = [
@@ -159,6 +161,9 @@ NON_KERBERIZED_METHODS = [
     "walkman.get-tracks",
     "action.is_done",
     "action.do",
+    "room.items",
+    "item.description",
+    "item.location",
 ]
 
 
@@ -321,49 +326,6 @@ def scan_users(client: KerberosClient, verbose=1):
     return result
 
 
-def scan_active_users(
-    client: KerberosClient, verbose=1, protected=False, show_duplicate=False
-):
-    users_dict = {}  # Dictionary to store best record for each user
-    world_list = client.list_worlds()
-    result = []
-
-    for w in world_list:
-        w_ID = w[0]
-        user = client.use_from_world(w_ID)
-        if not user:
-            continue
-
-        location = client.location(w_ID)
-        room = client.room_name(w_ID, location)
-        data = client.data_collection(w_ID)
-        if protected:
-            data["email"] = "N/A"
-
-        record = {
-            "user": user,
-            "world_id": w_ID,
-            "location": location,
-            "room": room,
-            "data": data,
-        }
-
-        if show_duplicate:
-            result.append(record)
-        else:
-
-            if user not in users_dict or len(data) > len(users_dict[user]["data"]):
-                users_dict[user] = record
-
-        if verbose > 0:
-            print(user, file=sys.stderr)
-
-    if not show_duplicate:
-        result = list(users_dict.values())
-
-    return result
-
-
 def all_man(client: KerberosClient, verbose=1):
     result = []
     for method in NON_KERBERIZED_METHODS + KERBERIZED_METHODS:
@@ -375,12 +337,14 @@ def all_man(client: KerberosClient, verbose=1):
     return result
 
 
-K_CLIENT = KerberosClient()
+# K_CLIENT = KerberosClient()
 # jprint(K_CLIENT.get_server_history())
 # jprint(K_CLIENT.man("protagonist.username"))
 
 
 # jprint(K_CLIENT.use_from_world("c89e87be37e427e86e9720fc6329bd6f"))
 # all_man(K_CLIENT)
-scan = scan_active_users(K_CLIENT, verbose=1)
-jprint(scan)
+if __name__ == "__main__":
+    K_CLIENT = KerberosClient()
+    # print(K_CLIENT.man("item.description"))
+    print(K_CLIENT.man("room.neighbor"))
