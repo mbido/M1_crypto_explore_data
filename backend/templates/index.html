@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kerberos Data Explorer</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <!-- CSS Personnalisé (Optionnel) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        // Configuration Tailwind (optionnel, pour couleurs custom etc)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'navy': '#0a192f',
+                        'light-navy': '#112240',
+                        'lightest-navy': '#233554',
+                        'slate': '#8892b0',
+                        'light-slate': '#a8b2d1',
+                        'lightest-slate': '#ccd6f6',
+                        'white': '#e6f1ff',
+                        'green': '#64ffda',
+                    }
+                }
+            },
+            darkMode: 'class', // Activer le support du dark mode via une classe
+        }
+    </script>
+    <style>
+        /* Style de base pour le dark mode */
+        .dark body { background-color: #0a192f; color: #ccd6f6; }
+        .dark .bg-white { background-color: #112240 !important; }
+        .dark .text-gray-900 { color: #e6f1ff !important; }
+        .dark .text-gray-700 { color: #a8b2d1 !important; }
+        .dark .text-gray-500 { color: #8892b0 !important; }
+        .dark .border-gray-200 { border-color: #233554 !important; }
+        .dark .hover\:bg-gray-100:hover { background-color: #233554 !important; }
+        .dark input, .dark select, .dark textarea { background-color: #233554; color: #ccd6f6; border-color: #8892b0;}
+        .dark table thead { color: #e6f1ff; }
+        /* Ajout pour les liens */
+        .dark a { color: #64ffda; }
+        .dark nav a.active { color: #ffffff; background-color: #64ffda1a; }
+        .dark nav a:hover { background-color: #64ffda1a; }
+        /* Loading spinner style */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #64ffda; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Style pour les tables scrollables */
+        .table-container { max-height: 60vh; overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <div class="flex flex-col md:flex-row min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-white md:bg-light-navy text-gray-900 md:text-lightest-slate flex-shrink-0">
+            <div class="p-4 text-2xl font-bold border-b border-gray-200 md:border-lightest-navy">
+                <i class="fas fa-shield-halved mr-2 text-green"></i>Kerberos Data
+            </div>
+            <nav class="mt-4 flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 p-2 md:p-0">
+                <a href="#dashboard" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+                    <i class="fas fa-tachometer-alt mr-2 w-4 text-center"></i>Dashboard
+                </a>
+                <a href="#users" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+                    <i class="fas fa-users mr-2 w-4 text-center"></i>Utilisateurs
+                </a>
+                <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+                    <i class="fas fa-exchange-alt mr-2 w-4 text-center"></i>Comparer Flags
+                </a>
+                <!-- Ajouter d'autres liens ici si besoin -->
+                <button id="darkModeToggle" class="mt-4 ml-4 md:ml-0 md:mt-auto py-2 px-4 text-left text-sm md:text-base">
+                    <i class="fas fa-moon mr-2"></i> Mode Sombre
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+            <div id="loading" class="loader hidden"></div>
+            <div id="content" class="">
+                <!-- Le contenu dynamique sera chargé ici par JavaScript -->
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Bienvenue</h1>
+                 <p class="text-gray-600 dark:text-slate mt-2">Sélectionnez une section dans le menu de gauche.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
