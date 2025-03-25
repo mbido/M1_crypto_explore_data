@@ -373,7 +373,6 @@ def scan_active_users(client: KerberosClient, protected=False):
 if __name__ == "__main__":
     # 1. Initialiser la base de données unique (crée le fichier et les tables si besoin)
     initialize_database()
-    exit()
     # === Section de Migration (À exécuter UNE SEULE FOIS) ===
     # Décommentez cette section UNIQUEMENT si vous voulez lancer la migration
     # depuis ce script Python (moins recommandé que la méthode sqlite3 CLI)

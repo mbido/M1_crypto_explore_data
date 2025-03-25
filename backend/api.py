@@ -1,12 +1,18 @@
 # backend/api.py
 import sqlite3
 import os
+import subprocess  # <-- Added import
+import sys  # <-- Added import
 from flask import Flask, jsonify, g, render_template, abort, request
 from flask_cors import CORS  # Pour autoriser les requêtes depuis le JS
 
 # --- Configuration ---
 # Le chemin est relatif à l'emplacement de api.py
 DATABASE = os.path.join("..", "db", "game_data.db")
+# Determine the path to update_db.py relative to api.py
+# Assuming api.py is in backend/ and update_db.py is in the parent directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+UPDATE_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "..", "update_db.py")
 # --- Fin Configuration ---
 
 # Vérifie si la DB existe au démarrage
@@ -14,6 +20,12 @@ if not os.path.exists(DATABASE):
     raise FileNotFoundError(
         f"ERREUR: Base de données non trouvée à {os.path.abspath(DATABASE)}. Assurez-vous qu'elle existe."
     )
+# Vérifie si le script d'update existe
+if not os.path.exists(UPDATE_SCRIPT_PATH):
+    print(
+        f"AVERTISSEMENT: Script d'update non trouvé à {UPDATE_SCRIPT_PATH}. Le bouton d'update ne fonctionnera pas."
+    )
+    # Ne pas lever d'erreur, l'API peut fonctionner sans
 
 app = Flask(
     __name__, static_folder="static", template_folder="templates"  # Dossier pour JS/CSS
@@ -67,13 +79,19 @@ def get_stats():
     """Récupère des statistiques globales."""
     try:
         # Compte les utilisateurs uniques dans la table users
-        user_count = query_db("SELECT COUNT(DISTINCT username) FROM users", one=True)[
-            "COUNT(DISTINCT username)"
-        ]
+        user_count_res = query_db(
+            "SELECT COUNT(DISTINCT username) FROM users", one=True
+        )
+        user_count = user_count_res["COUNT(DISTINCT username)"] if user_count_res else 0
+
         # Compte les mondes uniques dans la table worlds
-        world_count = query_db("SELECT COUNT(DISTINCT world_ID) FROM worlds", one=True)[
-            "COUNT(DISTINCT world_ID)"
-        ]
+        world_count_res = query_db(
+            "SELECT COUNT(DISTINCT world_ID) FROM worlds", one=True
+        )
+        world_count = (
+            world_count_res["COUNT(DISTINCT world_ID)"] if world_count_res else 0
+        )
+
         # Compte les bases de flags uniques (avant le ':')
         flags_raw = query_db("SELECT DISTINCT flag FROM flags")
         if flags_raw is None:
@@ -230,6 +248,92 @@ def compare_users():
     )
 
 
+# --- NOUVELLE ROUTE ---
+@app.route("/api/update-db", methods=["POST"])
+def trigger_db_update():
+    """Exécute le script update_db.py."""
+    if not os.path.exists(UPDATE_SCRIPT_PATH):
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Script d'update non configuré ou non trouvé sur le serveur.",
+                }
+            ),
+            501,
+        )  # 501 Not Implemented
+
+    print(f"Tentative d'exécution du script: {UPDATE_SCRIPT_PATH}")
+    try:
+        # Exécute le script en utilisant le même interpréteur Python que celui qui exécute Flask
+        # Capture stdout et stderr, décode en UTF-8
+        # Ajout d'un timeout (par exemple, 5 minutes) pour éviter les blocages indéfinis
+        # ATTENTION: Ceci bloque toujours le worker Flask pendant l'exécution.
+        # Pour des scripts très longs, une solution asynchrone (Celery, RQ) est préférable.
+        process = subprocess.run(
+            [sys.executable, UPDATE_SCRIPT_PATH],
+            capture_output=True,
+            text=True,
+            check=False,  # Ne pas lever d'exception si le script retourne un code non nul
+            timeout=300,  # Timeout de 5 minutes (ajuster si nécessaire)
+        )
+
+        print(f"Script terminé avec le code: {process.returncode}")
+        # print(f"stdout:\n{process.stdout}") # Optionnel: log stdout
+        # print(f"stderr:\n{process.stderr}") # Optionnel: log stderr
+
+        if process.returncode == 0:
+            # Succès - peut inclure une partie du stdout si pertinent
+            output_summary = process.stdout.strip().splitlines()
+            message = f"Mise à jour terminée avec succès."
+            if output_summary:
+                # Prend les 5 dernières lignes de la sortie comme résumé
+                message += "\n" + "\n".join(output_summary[-5:])
+            return jsonify({"success": True, "message": message})
+        else:
+            # Échec - inclure stderr dans la réponse d'erreur
+            error_message = (
+                f"Le script de mise à jour a échoué (code: {process.returncode})."
+            )
+            if process.stderr:
+                error_details = process.stderr.strip().splitlines()
+                error_message += "\n" + "\n".join(
+                    error_details[-5:]
+                )  # Dernières 5 lignes de l'erreur
+            elif process.stdout:  # Parfois l'erreur est sur stdout
+                error_details = process.stdout.strip().splitlines()
+                error_message += "\n" + "\n".join(error_details[-5:])
+
+            print(f"Erreur lors de l'exécution du script: {error_message}")
+            return jsonify({"success": False, "error": error_message}), 500
+
+    except subprocess.TimeoutExpired:
+        print(f"Erreur: Le script de mise à jour a dépassé le timeout de 300 secondes.")
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "L'opération de mise à jour a pris trop de temps et a été interrompue.",
+                }
+            ),
+            500,
+        )
+    except Exception as e:
+        print(f"Erreur inattendue lors de la tentative d'exécution du script: {e}")
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Erreur serveur inattendue lors du lancement de la mise à jour: {e}",
+                }
+            ),
+            500,
+        )
+
+
+# --- FIN NOUVELLE ROUTE ---
+
+
 # --- Route pour servir l'interface HTML ---
 @app.route("/")
 def index():
@@ -242,6 +346,10 @@ if __name__ == "__main__":
     print("*" * 50)
     print(f"Démarrage du serveur API Kerberos Data")
     print(f"Base de données: {os.path.abspath(DATABASE)}")
+    if os.path.exists(UPDATE_SCRIPT_PATH):
+        print(f"Script d'update: {UPDATE_SCRIPT_PATH}")
+    else:
+        print(f"Script d'update: NON TROUVÉ à {UPDATE_SCRIPT_PATH}")
     print(f"Interface disponible à: http://127.0.0.1:5002")  # Changer le port si besoin
     print("*" * 50)
     # host='0.0.0.0' rend le serveur accessible depuis d'autres machines sur le réseau

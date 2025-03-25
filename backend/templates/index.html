@@ -45,55 +45,77 @@
         .dark a { color: #64ffda; }
         .dark nav a.active { color: #ffffff; background-color: #64ffda1a; }
         .dark nav a:hover { background-color: #64ffda1a; }
+
         /* Loading spinner style */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #64ffda; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         /* Style pour les tables scrollables */
         .table-container { max-height: 60vh; overflow-y: auto; }
-        .dark .user-dropdown {
-  background-color: #233554; /* lightest-navy */
-  border-color: #8892b0; /* slate */
-}
-.dark .user-dropdown .dropdown-item {
-  color: #ccd6f6; /* lightest-slate */
-}
-.dark .user-dropdown .dropdown-item:hover {
-  background-color: #112240; /* light-navy */
-}
-.dark .user-dropdown .p-2.text-sm.text-gray-500 { /* "Aucun utilisateur trouvé" */
-    color: #8892b0; /* slate */
-}
+
+        /* Style pour les dropdowns recherchables */
+        .user-dropdown .dropdown-item { /* Basic item styling */ }
+        .dark .user-dropdown { background-color: #233554; border-color: #8892b0; }
+        .dark .user-dropdown .dropdown-item { color: #ccd6f6; }
+        .dark .user-dropdown .dropdown-item:hover { background-color: #112240; }
+        .dark .user-dropdown .p-2.text-sm.text-gray-500 { color: #8892b0; }
+
+        /* Style pour le bouton d'update pendant le chargement */
+        .button-loading { cursor: not-allowed; opacity: 0.7; }
+        /* Styles pour les messages de statut */
+        .status-message { padding: 0.5rem 1rem; margin-top: 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; border-width: 1px; }
+        .status-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+        .dark .status-success { color: #a3e9a4; background-color: #1c3c23; border-color: #2a5a38; }
+        .status-error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
+        .dark .status-error { color: #f8b4b7; background-color: #4a1d1f; border-color: #742b30; }
+        .status-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
+        .dark .status-info { color: #a3dae9; background-color: #1a3a4a; border-color: #2a5a70; }
+        .fa-spin { animation: spin 1s linear infinite; } /* Assure que l'animation spin fonctionne */
 
     </style>
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+<body class="bg-gray-100 dark:bg-navy font-sans leading-normal tracking-normal">
 
     <div class="flex flex-col md:flex-row min-h-screen">
         <!-- Sidebar -->
-        <aside class="w-full md:w-64 bg-white md:bg-light-navy text-gray-900 md:text-lightest-slate flex-shrink-0">
-            <div class="p-4 text-2xl font-bold border-b border-gray-200 md:border-lightest-navy">
+        <aside class="w-full md:w-64 bg-white dark:bg-light-navy text-gray-900 dark:text-lightest-slate flex-shrink-0 flex flex-col">
+            <div class="p-4 text-2xl font-bold border-b border-gray-200 dark:border-lightest-navy flex-shrink-0">
                 <i class="fas fa-shield-halved mr-2 text-green"></i>Kerberos Data
             </div>
-            <nav class="mt-4 flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 p-2 md:p-0">
-                <a href="#dashboard" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+            <nav class="flex-grow mt-4 flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 p-2 md:p-0 overflow-y-auto">
+                <a href="#dashboard" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
                     <i class="fas fa-tachometer-alt mr-2 w-4 text-center"></i>Dashboard
                 </a>
-                <a href="#users" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+                <a href="#users" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
                     <i class="fas fa-users mr-2 w-4 text-center"></i>Utilisateurs
                 </a>
-                <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 md:hover:bg-lightest-navy text-sm md:text-base">
+                <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
                     <i class="fas fa-exchange-alt mr-2 w-4 text-center"></i>Comparer Flags
                 </a>
                 <!-- Ajouter d'autres liens ici si besoin -->
-                <button id="darkModeToggle" class="mt-4 ml-4 md:ml-0 md:mt-auto py-2 px-4 text-left text-sm md:text-base">
-                    <i class="fas fa-moon mr-2"></i> Mode Sombre
-                </button>
+
+                <!-- === NOUVEAU BOUTON === -->
+                <div class="mt-4 px-4">
+                    <button id="updateDbButton" class="w-full text-left py-2 px-4 rounded transition duration-200 bg-blue-100 hover:bg-blue-200 dark:bg-lightest-navy dark:hover:bg-navy text-blue-800 dark:text-light-slate text-sm md:text-base">
+                        <i class="fas fa-sync-alt mr-2 w-4 text-center"></i>Actualiser DB
+                    </button>
+                    <!-- Zone pour afficher le statut de l'update -->
+                    <div id="updateStatus" class="mt-2"></div>
+                </div>
+                 <!-- === FIN NOUVEAU BOUTON === -->
+
             </nav>
+             <!-- Bouton Mode Sombre en bas -->
+            <div class="mt-auto p-4 flex-shrink-0">
+                <button id="darkModeToggle" class="w-full text-left py-2 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
+                    <!-- Le contenu sera mis à jour par JS -->
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 p-4 md:p-8 overflow-y-auto">
-            <div id="loading" class="loader hidden"></div>
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-100 dark:bg-navy">
+            <div id="loading" class="loader hidden"></div> <!-- Loader global existant -->
             <div id="content" class="">
                 <!-- Le contenu dynamique sera chargé ici par JavaScript -->
                 <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Bienvenue</h1>
