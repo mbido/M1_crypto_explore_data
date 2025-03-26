@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const darkModeToggle = document.getElementById('darkModeToggle');
   const updateDbButton = document.getElementById('updateDbButton');
   const updateStatusDiv = document.getElementById('updateStatus');
+  const notesArea = document.getElementById('notesArea');
   const API_BASE_URL = '/api';
 
   // --- Variables d'état ---
@@ -950,6 +951,37 @@ document.addEventListener('DOMContentLoaded', () => {
     hideLoading();  // Hide main loader once sandbox is rendered
   }  // --- End renderSandbox ---
 
+  // === GESTION DU BLOC-NOTES ===
+  if (notesArea) {
+    // Charger les notes depuis localStorage au démarrage
+    try {
+      const savedNotes = localStorage.getItem('userNotes');
+      if (savedNotes !==
+          null) {  // Vérifier si null existe (chaîne vide est ok)
+        notesArea.value = savedNotes;
+      }
+    } catch (e) {
+      console.error(
+          'Erreur lors du chargement des notes depuis localStorage:', e);
+      // Optionnel: Afficher un message à l'utilisateur si le stockage échoue
+      // notesArea.placeholder = "Impossible de charger les notes
+      // sauvegardées."; notesArea.disabled = true;
+    }
+
+    // Sauvegarder les notes dans localStorage à chaque modification
+    notesArea.addEventListener('input', () => {
+      try {
+        localStorage.setItem('userNotes', notesArea.value);
+      } catch (e) {
+        console.error(
+            'Erreur lors de la sauvegarde des notes dans localStorage:', e);
+        // Optionnel: Informer l'utilisateur que la sauvegarde échoue
+      }
+    });
+  } else {
+    console.warn('L\'élément #notesArea n\'a pas été trouvé dans le DOM.');
+  }
+  // === FIN GESTION BLOC-NOTES ===
 
   // --- Logique de Routage Côté Client ---
   async function handleRouteChange() {
