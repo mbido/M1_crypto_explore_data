@@ -8,30 +8,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome pour les icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-    <!-- CSS Personnalisé (Optionnel) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- CSS/JS Personnalisé (Optionnel, ex: pour syntax highlighting) -->
+    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> -->
+    <!-- highlight.js if needed for JSON results -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
     <script>
-        // Configuration Tailwind (optionnel, pour couleurs custom etc)
+        // Configuration Tailwind
         tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'navy': '#0a192f',
-                        'light-navy': '#112240',
-                        'lightest-navy': '#233554',
-                        'slate': '#8892b0',
-                        'light-slate': '#a8b2d1',
-                        'lightest-slate': '#ccd6f6',
-                        'white': '#e6f1ff',
-                        'green': '#64ffda',
-                    }
+            theme: { extend: { /* your existing colors */
+                colors: {
+                    'navy': '#0a192f', 'light-navy': '#112240', 'lightest-navy': '#233554',
+                    'slate': '#8892b0', 'light-slate': '#a8b2d1', 'lightest-slate': '#ccd6f6',
+                    'white': '#e6f1ff', 'green': '#64ffda',
                 }
-            },
-            darkMode: 'class', // Activer le support du dark mode via une classe
+            } },
+            darkMode: 'class',
         }
     </script>
     <style>
-        /* Style de base pour le dark mode */
+        /* --- Styles Dark Mode, Loader, Table, Dropdown, Update Button (Keep as is) --- */
         .dark body { background-color: #0a192f; color: #ccd6f6; }
         .dark .bg-white { background-color: #112240 !important; }
         .dark .text-gray-900 { color: #e6f1ff !important; }
@@ -39,30 +36,21 @@
         .dark .text-gray-500 { color: #8892b0 !important; }
         .dark .border-gray-200 { border-color: #233554 !important; }
         .dark .hover\:bg-gray-100:hover { background-color: #233554 !important; }
-        .dark input, .dark select, .dark textarea { background-color: #233554; color: #ccd6f6; border-color: #8892b0;}
+        .dark input, .dark select, .dark textarea, .dark pre { background-color: #233554; color: #ccd6f6; border-color: #8892b0;}
         .dark table thead { color: #e6f1ff; }
-        /* Ajout pour les liens */
         .dark a { color: #64ffda; }
         .dark nav a.active { color: #ffffff; background-color: #64ffda1a; }
         .dark nav a:hover { background-color: #64ffda1a; }
-
-        /* Loading spinner style */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #64ffda; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Style pour les tables scrollables */
         .table-container { max-height: 60vh; overflow-y: auto; }
-
-        /* Style pour les dropdowns recherchables */
         .user-dropdown .dropdown-item { /* Basic item styling */ }
         .dark .user-dropdown { background-color: #233554; border-color: #8892b0; }
         .dark .user-dropdown .dropdown-item { color: #ccd6f6; }
         .dark .user-dropdown .dropdown-item:hover { background-color: #112240; }
         .dark .user-dropdown .p-2.text-sm.text-gray-500 { color: #8892b0; }
-
-        /* Style pour le bouton d'update pendant le chargement */
         .button-loading { cursor: not-allowed; opacity: 0.7; }
-        /* Styles pour les messages de statut */
+        .fa-spin { animation: spin 1s linear infinite; }
         .status-message { padding: 0.5rem 1rem; margin-top: 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; border-width: 1px; }
         .status-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
         .dark .status-success { color: #a3e9a4; background-color: #1c3c23; border-color: #2a5a38; }
@@ -70,7 +58,37 @@
         .dark .status-error { color: #f8b4b7; background-color: #4a1d1f; border-color: #742b30; }
         .status-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
         .dark .status-info { color: #a3dae9; background-color: #1a3a4a; border-color: #2a5a70; }
-        .fa-spin { animation: spin 1s linear infinite; } /* Assure que l'animation spin fonctionne */
+
+        /* --- Styles spécifiques au Sandbox --- */
+        .sandbox-card { transition: box-shadow 0.2s ease-in-out; }
+        .sandbox-card:hover { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
+        .dark .sandbox-card:hover { box-shadow: 0 4px 15px rgba(100, 255, 218, 0.1); }
+        .params-area label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.875rem;}
+        .params-area input[type="text"],
+        .params-area textarea {
+            width: 100%; padding: 0.5rem; border: 1px solid; border-radius: 0.25rem;
+            margin-bottom: 0.75rem; font-family: monospace; font-size: 0.875rem;
+        }
+        /* Style pour les résultats formatés en JSON */
+        .result-area pre {
+            white-space: pre-wrap; /* Wrap long lines */
+            word-wrap: break-word; /* Break words if needed */
+            max-height: 400px; /* Limit height */
+            overflow-y: auto; /* Add scrollbar if needed */
+            padding: 1rem;
+            border-radius: 0.25rem;
+            border: 1px solid; /* Use default border color */
+            font-size: 0.8rem; /* Smaller font for results */
+            background-color: #f8f9fa; /* Light background for light mode */
+        }
+        .dark .result-area pre {
+             background-color: #233554; /* Dark background for dark mode */
+             border-color: #8892b0;
+        }
+        .result-area pre code.hljs { /* Ensure highlightjs background is transparent */
+             background: transparent !important;
+             padding: 0; /* Remove default padding if pre handles it */
+        }
 
     </style>
 </head>
@@ -92,32 +110,33 @@
                 <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
                     <i class="fas fa-exchange-alt mr-2 w-4 text-center"></i>Comparer Flags
                 </a>
-                <!-- Ajouter d'autres liens ici si besoin -->
+                <!-- === NOUVEAU LIEN SANDBOX === -->
+                <a href="#sandbox" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
+                    <i class="fas fa-terminal mr-2 w-4 text-center"></i>Sandbox
+                </a>
+                <!-- === FIN NOUVEAU LIEN SANDBOX === -->
 
-                <!-- === NOUVEAU BOUTON === -->
+                <!-- Bouton Update DB -->
                 <div class="mt-4 px-4">
                     <button id="updateDbButton" class="w-full text-left py-2 px-4 rounded transition duration-200 bg-blue-100 hover:bg-blue-200 dark:bg-lightest-navy dark:hover:bg-navy text-blue-800 dark:text-light-slate text-sm md:text-base">
                         <i class="fas fa-sync-alt mr-2 w-4 text-center"></i>Actualiser DB
                     </button>
-                    <!-- Zone pour afficher le statut de l'update -->
                     <div id="updateStatus" class="mt-2"></div>
                 </div>
-                 <!-- === FIN NOUVEAU BOUTON === -->
-
             </nav>
-             <!-- Bouton Mode Sombre en bas -->
+             <!-- Bouton Mode Sombre -->
             <div class="mt-auto p-4 flex-shrink-0">
                 <button id="darkModeToggle" class="w-full text-left py-2 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    <!-- Le contenu sera mis à jour par JS -->
+                    <!-- Contenu mis à jour par JS -->
                 </button>
             </div>
         </aside>
 
         <!-- Main Content -->
         <main class="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-100 dark:bg-navy">
-            <div id="loading" class="loader hidden"></div> <!-- Loader global existant -->
+            <div id="loading" class="loader hidden"></div> <!-- Loader global -->
             <div id="content" class="">
-                <!-- Le contenu dynamique sera chargé ici par JavaScript -->
+                <!-- Contenu dynamique chargé ici -->
                 <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Bienvenue</h1>
                  <p class="text-gray-600 dark:text-slate mt-2">Sélectionnez une section dans le menu de gauche.</p>
             </div>
