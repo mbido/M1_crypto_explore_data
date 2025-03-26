@@ -1,4 +1,4 @@
 .env
 *.json
-db/*
+db/*.db
 __pycache__

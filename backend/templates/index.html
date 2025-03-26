@@ -6,187 +6,259 @@
     <title>Kerberos Data Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <!-- Highlight.js theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <!-- Highlight.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Optionally include languages if needed, though JSON is usually built-in -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script> -->
+
 
     <script>
-        // Configuration Tailwind
+        // Configuration Tailwind (avec les couleurs custom)
         tailwind.config = {
-            theme: { extend: { /* your existing colors */
-                colors: {
-                    'navy': '#0a192f', 'light-navy': '#112240', 'lightest-navy': '#233554',
-                    'slate': '#8892b0', 'light-slate': '#a8b2d1', 'lightest-slate': '#ccd6f6',
-                    'white': '#e6f1ff', 'green': '#64ffda',
+            theme: {
+                extend: {
+                    colors: {
+                        'navy': '#0a192f',
+                        'light-navy': '#112240',
+                        'lightest-navy': '#233554',
+                        'slate': '#8892b0',
+                        'light-slate': '#a8b2d1',
+                        'lightest-slate': '#ccd6f6',
+                        'white': '#e6f1ff', // Couleur texte principale en dark mode
+                        'green': '#64ffda', // Couleur accent
+                        // Ajoutez d'autres couleurs si nécessaire
+                    }
                 }
-            } },
-            darkMode: 'class',
+            },
+            darkMode: 'class', // Active le mode sombre basé sur la classe 'dark' sur <html>
         }
     </script>
     <style>
-        /* --- Styles Dark Mode, Loader, Table, Dropdown, Update Button etc. (Keep as is) --- */
-        .dark body { background-color: #0a192f; color: #ccd6f6; }
-        .dark .bg-white { background-color: #112240 !important; }
-        .dark .text-gray-900 { color: #e6f1ff !important; }
-        .dark .text-gray-700 { color: #a8b2d1 !important; }
-        .dark .text-gray-500 { color: #8892b0 !important; }
-        .dark .border-gray-200 { border-color: #233554 !important; }
-        .dark .hover\:bg-gray-100:hover { background-color: #233554 !important; }
-        .dark input, .dark select, .dark textarea, .dark pre { background-color: #233554; color: #ccd6f6; border-color: #8892b0;}
-        .dark table thead { color: #e6f1ff; }
-        .dark a { color: #64ffda; }
-        .dark nav a.active { color: #ffffff; background-color: #64ffda1a; }
-        .dark nav a:hover { background-color: #64ffda1a; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #64ffda; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        /* --- Styles Dark Mode --- */
+        .dark body { background-color: theme('colors.navy'); color: theme('colors.lightest-slate'); }
+        .dark .bg-white { background-color: theme('colors.light-navy') !important; } /* Override */
+        .dark .bg-gray-50 { background-color: theme('colors.lightest-navy'); }
+        .dark .bg-gray-100 { background-color: theme('colors.navy'); } /* Ajustement pour le body */
+        .dark .text-gray-900 { color: theme('colors.white') !important; } /* Texte principal */
+        .dark .text-gray-800 { color: theme('colors.lightest-slate'); }
+        .dark .text-gray-700 { color: theme('colors.light-slate'); }
+        .dark .text-gray-600 { color: theme('colors.slate'); }
+        .dark .text-gray-500 { color: theme('colors.slate'); }
+        .dark .border-gray-200 { border-color: theme('colors.lightest-navy'); }
+        .dark .border-gray-300 { border-color: theme('colors.slate'); }
+        .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: theme('colors.lightest-navy'); } /* For table dividers */
+
+        /* Inputs & Interactive Elements */
+        .dark input, .dark select, .dark textarea, .dark pre {
+            background-color: theme('colors.lightest-navy');
+            color: theme('colors.lightest-slate');
+            border-color: theme('colors.slate');
+        }
+        .dark input::placeholder, .dark textarea::placeholder { color: theme('colors.slate'); }
+        .dark input:focus, .dark select:focus, .dark textarea:focus {
+             border-color: theme('colors.green');
+             box-shadow: 0 0 0 2px theme('colors.green' / 50%); /* Ring focus */
+             outline: none;
+         }
+
+
+        /* Links & Buttons */
+        .dark a { color: theme('colors.green'); }
+        .dark a:hover { color: theme('colors.green' / 80%); }
+        .dark .text-blue-500 { color: theme('colors.green'); } /* Specific overrides */
+        .dark .bg-blue-500 { background-color: theme('colors.green'); color: theme('colors.navy');} /* Example button */
+        .dark .bg-blue-100 { background-color: theme('colors.lightest-navy');}
+        .dark .text-blue-800 { color: theme('colors.light-slate');}
+        .dark .hover\:bg-blue-200:hover { background-color: theme('colors.navy');}
+
+
+        /* Sidebar */
+        .dark .sticky-aside { background-color: theme('colors.light-navy'); color: theme('colors.light-slate');}
+        .dark .sticky-aside .border-b { border-color: theme('colors.lightest-navy');}
+        .dark nav a { color: theme('colors.light-slate'); }
+        .dark nav a:hover { background-color: theme('colors.lightest-navy'); color: theme('colors.white'); }
+        .dark nav a.active {
+            background-color: theme('colors.lightest-navy');
+            color: theme('colors.green');
+            font-weight: 600;
+        }
+
+        /* Table Styles */
+        .dark table thead { color: theme('colors.light-slate'); background-color: theme('colors.lightest-navy'); }
+        .dark tbody tr:hover { background-color: theme('colors.lightest-navy'); }
+
+
+        /* --- Loader --- */
+        .loader { border: 4px solid #f3f3f3; /* Light grey */ border-top: 4px solid theme('colors.green'); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        .dark .loader { border-color: theme('colors.lightest-navy'); border-top-color: theme('colors.green'); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .table-container { max-height: 60vh; overflow-y: auto; }
-        .user-dropdown .dropdown-item { /* Basic item styling */ }
-        .dark .user-dropdown { background-color: #233554; border-color: #8892b0; }
-        .dark .user-dropdown .dropdown-item { color: #ccd6f6; }
-        .dark .user-dropdown .dropdown-item:hover { background-color: #112240; }
-        .dark .user-dropdown .p-2.text-sm.text-gray-500 { color: #8892b0; }
+
+        /* --- Table Scroll Container --- */
+        .table-container { max-height: 65vh; overflow-y: auto; }
+
+        /* --- Dropdown --- */
+        .user-dropdown .dropdown-item:hover { background-color: #f0f0f0; }
+        .dark .user-dropdown { background-color: theme('colors.lightest-navy'); border-color: theme('colors.slate'); }
+        .dark .user-dropdown .dropdown-item { color: theme('colors.lightest-slate'); }
+        .dark .user-dropdown .dropdown-item:hover { background-color: theme('colors.navy'); }
+        .dark .user-dropdown .text-gray-500 { color: theme('colors.slate'); } /* No results message */
+
+        /* --- Button Loading State --- */
         .button-loading { cursor: not-allowed; opacity: 0.7; }
         .fa-spin { animation: spin 1s linear infinite; }
-        .status-message { padding: 0.5rem 1rem; margin-top: 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; border-width: 1px; }
+
+        /* --- Status Messages --- */
+        .status-message { padding: 0.75rem 1rem; margin-top: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; border-width: 1px; }
         .status-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
-        .dark .status-success { color: #a3e9a4; background-color: #1c3c23; border-color: #2a5a38; }
+        .dark .status-success { color: theme('colors.green' / 90%); background-color: theme('colors.green' / 10%); border-color: theme('colors.green' / 30%); }
         .status-error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
         .dark .status-error { color: #f8b4b7; background-color: #4a1d1f; border-color: #742b30; }
         .status-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
         .dark .status-info { color: #a3dae9; background-color: #1a3a4a; border-color: #2a5a70; }
 
-        /* --- Styles spécifiques au Sandbox --- */
+        /* --- Sandbox Styles --- */
         .sandbox-card { transition: box-shadow 0.2s ease-in-out; }
         .sandbox-card:hover { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
         .dark .sandbox-card:hover { box-shadow: 0 4px 15px rgba(100, 255, 218, 0.1); }
-        .params-area label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.875rem;}
-        .params-area input[type="text"],
-        .params-area textarea {
-            width: 100%; padding: 0.5rem; border: 1px solid; border-radius: 0.25rem;
-            margin-bottom: 0.75rem; font-family: monospace; font-size: 0.875rem;
-        }
-        /* Style pour les résultats formatés en JSON */
+        /* Result area pre formatting */
         .result-area pre {
-            white-space: pre-wrap; /* Wrap long lines */
-            word-wrap: break-word; /* Break words if needed */
-            max-height: 400px; /* Limit height */
-            overflow-y: auto; /* Add scrollbar if needed */
-            padding: 1rem;
-            border-radius: 0.25rem;
-            border: 1px solid; /* Use default border color */
-            font-size: 0.8rem; /* Smaller font for results */
-            background-color: #f8f9fa; /* Light background for light mode */
+            white-space: pre-wrap; word-wrap: break-word;
+            max-height: 400px; overflow-y: auto;
+            padding: 1rem; border-radius: 0.25rem; border: 1px solid;
+            font-size: 0.8rem; background-color: #f8f9fa;
         }
-        .dark .result-area pre {
-             background-color: #233554; /* Dark background for dark mode */
-             border-color: #8892b0;
-        }
-        .result-area pre code.hljs { /* Ensure highlightjs background is transparent */
-             background: transparent !important;
-             padding: 0; /* Remove default padding if pre handles it */
-        }
+        .dark .result-area pre { background-color: theme('colors.lightest-navy'); border-color: theme('colors.slate'); }
+        /* Ensure highlightjs background is transparent */
+        .result-area pre code.hljs { background: transparent !important; padding: 0; }
 
-        /* --- NOUVEAUX STYLES / MODIFICATIONS pour Aside Sticky --- */
+        /* --- Sticky Sidebar --- */
         .sticky-aside {
-            position: -webkit-sticky; /* Pour Safari */
-            position: sticky;
-            top: 0; /* Colle l'aside en haut du viewport lors du scroll */
-            height: 100vh; /* Occupe toute la hauteur de la fenêtre */
-            align-self: flex-start; /* Empêche l'étirement vertical par le conteneur flex principal */
-            overflow-y: auto; /* PERMET LE SCROLL INTERNE DE L'ASIDE si son contenu est trop long */
+            position: -webkit-sticky; position: sticky;
+            top: 0; height: 100vh; align-self: flex-start;
+            overflow-y: auto; /* Allows sidebar itself to scroll if content exceeds viewport height */
+            /* Scrollbar styling (optional) */
+            scrollbar-width: thin; scrollbar-color: theme('colors.slate') transparent;
         }
+        .dark .sticky-aside { scrollbar-color: theme('colors.slate') theme('colors.light-navy'); }
 
-        /* Assurez-vous que la nav ne prend plus tout l'espace et ne scrolle plus elle-même */
-        .sticky-aside nav {
-             /* flex-grow: 1; */ /* Retiré ou commenté */
-             /* overflow-y: auto; */ /* Retiré ou commenté */
-             flex-shrink: 0; /* Empêche la nav de rétrécir si l'espace manque */
-        }
 
-        /* --- STYLES POUR LA ZONE DE NOTES (inchangés) --- */
-        #notesContainer label {
-             display: block;
-             margin-bottom: 0.5rem; /* 8px */
-             font-weight: 600; /* semibold */
-             font-size: 0.875rem; /* text-sm */
-             color: #4b5563; /* text-gray-700 */
-        }
-        .dark #notesContainer label {
-            color: #a8b2d1; /* dark:text-light-slate */
-        }
+        /* --- Notes Area --- */
         #notesArea {
-            width: 100%;
-            min-height: 100px; /* Hauteur minimale */
-            max-height: 200px; /* Hauteur maximale avant scroll */
-            padding: 0.5rem; /* p-2 */
-            border: 1px solid #d1d5db; /* border-gray-300 */
-            border-radius: 0.375rem; /* rounded-md */
-            font-size: 0.875rem; /* text-sm */
-            resize: vertical; /* Permet le redimensionnement vertical */
-            background-color: #f9fafb; /* bg-gray-50 */
-            color: #1f2937; /* text-gray-800 */
+            width: 100%; min-height: 100px; max-height: 250px; /* Increased max-height */
+            padding: 0.75rem; border: 1px solid; border-radius: 0.375rem;
+            font-size: 0.875rem; resize: vertical;
         }
-         .dark #notesArea {
-            background-color: #233554; /* dark:bg-lightest-navy */
-            border-color: #8892b0; /* dark:border-slate */
-            color: #ccd6f6; /* dark:text-lightest-slate */
+         /* Inherits colors via .dark input styles */
+
+         /* NOUVEAU: Style pour les cartes de salle */
+         .room-card {
+             /* Base styles sont définis dans app.js avec les classes Tailwind */
+             /* Vous pouvez ajouter des styles spécifiques ici si nécessaire */
+             word-break: break-word; /* Ensure long room names wrap */
+             min-height: 60px; /* Ensure minimum clickable height */
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             font-size: 0.8rem;
          }
-         /* --- FIN STYLES NOTES --- */
+         .room-card-disabled {
+             opacity: 0.5;
+             cursor: not-allowed;
+             pointer-events: none; /* Empêche les clics */
+         }
+         .room-card-teleporting {
+            /* Exemple: ajoute une bordure verte */
+            /* border: 2px solid theme('colors.green'); */
+            /* Ou une légère animation */
+             animation: pulse 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse {
+             0%, 100% { opacity: 1; }
+             50% { opacity: 0.6; }
+        }
 
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-navy font-sans leading-normal tracking-normal">
+<body class="bg-gray-100 dark:bg-navy font-sans leading-normal tracking-normal text-gray-800 dark:text-lightest-slate">
 
     <div class="flex flex-col md:flex-row min-h-screen">
 
-        <aside class="sticky-aside w-full md:w-64 bg-white dark:bg-light-navy text-gray-900 dark:text-lightest-slate flex-shrink-0 flex flex-col">
-            <div class="p-4 text-2xl font-bold border-b border-gray-200 dark:border-lightest-navy flex-shrink-0">
-                <i class="fas fa-shield-halved mr-2 text-green"></i>Kerberos Data
+        <!-- Sidebar -->
+        <aside class="sticky-aside w-full md:w-64 bg-white dark:bg-light-navy text-gray-900 dark:text-lightest-slate flex-shrink-0 flex flex-col shadow-lg md:shadow-none z-10 md:z-auto">
+            <!-- Logo/Header -->
+            <div class="p-4 text-2xl font-bold border-b border-gray-200 dark:border-lightest-navy flex-shrink-0 flex items-center">
+                <i class="fas fa-shield-halved mr-3 text-green text-3xl"></i>
+                <span class="text-xl">Kerberos Data</span>
             </div>
 
-            <nav class="mt-4 flex flex-row md:flex-col space-x-2 md:space-x-0 md:space-y-1 p-2 md:p-0 flex-shrink-0">
-                <a href="#dashboard" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    <i class="fas fa-tachometer-alt mr-2 w-4 text-center"></i>Dashboard
+            <!-- Navigation -->
+            <nav class="mt-4 flex flex-row md:flex-col flex-wrap md:flex-nowrap space-x-1 md:space-x-0 md:space-y-1 p-2 md:p-0 flex-shrink-0">
+                <a href="#dashboard" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base text-gray-600 dark:text-light-slate">
+                    <i class="fas fa-tachometer-alt mr-2 w-5 text-center"></i>Dashboard
                 </a>
-                <a href="#users" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    <i class="fas fa-users mr-2 w-4 text-center"></i>Utilisateurs
+                <a href="#users" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base text-gray-600 dark:text-light-slate">
+                    <i class="fas fa-users mr-2 w-5 text-center"></i>Utilisateurs
                 </a>
-                <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    <i class="fas fa-exchange-alt mr-2 w-4 text-center"></i>Comparer Flags
+                <a href="#compare" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base text-gray-600 dark:text-light-slate">
+                    <i class="fas fa-exchange-alt mr-2 w-5 text-center"></i>Comparer Flags
                 </a>
-                <a href="#sandbox" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    <i class="fas fa-terminal mr-2 w-4 text-center"></i>Sandbox
+                <a href="#sandbox" class="nav-link block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base text-gray-600 dark:text-light-slate">
+                    <i class="fas fa-terminal mr-2 w-5 text-center"></i>Sandbox
                 </a>
+                <!-- Add other navigation links here -->
+            </nav>
 
-                <div class="mt-4 px-4">
-                    <button id="updateDbButton" class="w-full text-left py-2 px-4 rounded transition duration-200 bg-blue-100 hover:bg-blue-200 dark:bg-lightest-navy dark:hover:bg-navy text-blue-800 dark:text-light-slate text-sm md:text-base">
-                        <i class="fas fa-sync-alt mr-2 w-4 text-center"></i>Actualiser DB
-                    </button>
-                    <div id="updateStatus" class="mt-2"></div>
-                </div>
-            </nav> <div id="notesContainer" class="mt-4 px-4 flex-shrink-0">
+            <!-- Update DB Button Section -->
+             <div class="mt-4 px-4 flex-shrink-0">
+                 <button id="updateDbButton" class="w-full text-left py-2 px-4 rounded transition duration-200 bg-blue-100 hover:bg-blue-200 dark:bg-lightest-navy dark:hover:bg-navy text-blue-800 dark:text-light-slate text-sm md:text-base flex items-center">
+                     <i class="fas fa-sync-alt mr-2 w-5 text-center"></i>Actualiser DB
+                 </button>
+                 <div id="updateStatus" class="mt-2"></div>
+             </div>
+
+            <!-- Notes Section -->
+            <div id="notesContainer" class="mt-4 px-4 flex-shrink-0">
                  <label for="notesArea" class="block text-sm font-semibold mb-2 text-gray-700 dark:text-light-slate">
                      <i class="fas fa-clipboard mr-2"></i>Bloc-notes
                  </label>
-                 <textarea id="notesArea" placeholder="Vos notes rapides ici..."></textarea>
+                 <textarea id="notesArea" class="border-gray-300 dark:border-slate bg-gray-50 dark:bg-lightest-navy" placeholder="Vos notes rapides ici..."></textarea>
              </div>
 
+
+            <!-- Dark Mode Toggle (Bottom) -->
             <div class="mt-auto p-4 flex-shrink-0">
-                <button id="darkModeToggle" class="w-full text-left py-2 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base">
-                    </button>
+                <button id="darkModeToggle" class="w-full text-left py-2 px-4 rounded transition duration-200 hover:bg-gray-100 dark:hover:bg-lightest-navy text-sm md:text-base text-gray-600 dark:text-light-slate flex items-center">
+                    <!-- Icon and text set by JS -->
+                </button>
             </div>
-        </aside> <main class="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-100 dark:bg-navy">
-            <div id="loading" class="loader hidden"></div>
-            <div id="content" class="">
-                <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Bienvenue</h1>
-                 <p class="text-gray-600 dark:text-slate mt-2">Sélectionnez une section dans le menu de gauche.</p>
-                 <div style="height: 150vh; background-color: rgba(100,100,255,0.1); margin-top: 20px; padding: 10px; border: 1px dashed gray;">
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-100 dark:bg-navy">
+            <!-- Loading Indicator -->
+            <div id="loading" class="loader"></div>
+            <!-- Dynamic Content -->
+            <div id="content" class="hidden">
+                 <!-- Content loaded by JS based on hash route -->
+                 <!-- Example initial content (optional) -->
+                 <!-- <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Bienvenue</h1>
+                 <p class="text-gray-600 dark:text-slate mt-2">Sélectionnez une section dans le menu de gauche.</p> -->
+
+                 <!-- Example content for testing scroll -->
+                 <!-- <div style="height: 150vh; background-color: rgba(100,100,255,0.1); margin-top: 20px; padding: 10px; border: 1px dashed gray;">
                      Contenu de test pour forcer le défilement de la page principale... <br>
                      Faites défiler vers le bas pour voir si la barre latérale reste fixe.
-                 </div>
+                 </div> -->
             </div>
         </main>
-    </div>
 
+    </div> <!-- End Flex Container -->
+
+    <!-- Link to App JS -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <!-- Initialize Highlight.js (can also be done in app.js) -->
+    <!-- <script>hljs.highlightAll();</script> -->
 </body>
 </html>
