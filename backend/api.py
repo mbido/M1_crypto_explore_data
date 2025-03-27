@@ -866,16 +866,16 @@ def get_reachable_rooms_endpoint():
         print(f"DFS: Client Kerberos instancié pour '{client.username}'.")
 
         # 1. Obtenir la position actuelle
-        current_location_id = client.location(world_id=world_id)
-        if not current_location_id:
-            raise ValueError(
-                "Impossible d'obtenir la position de départ."
-            )  # Raise specific error
-        print(f"DFS: Position de départ obtenue: {current_location_id}")
+        # current_location_id = client.location(world_id=world_id)
+        # if not current_location_id:
+        #     raise ValueError(
+        #         "Impossible d'obtenir la position de départ."
+        #     )  # Raise specific error
+        # print(f"DFS: Position de départ obtenue: {current_location_id}")
 
         # 2. Lancer le DFS
         # perform_dfs_search (get_all_rooms) retourne une liste de tuples (id, name)
-        rooms_tuples = perform_dfs_search(client, world_id, current_location_id)
+        rooms_tuples = perform_dfs_search(client, world_id)
         print(
             f"DFS: Recherche terminée, {len(rooms_tuples)} salles trouvées (avec doublons potentiels d'ID si noms différents)."
         )

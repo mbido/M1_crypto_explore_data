@@ -1,65 +1,11 @@
 # -*- coding: utf-8 -*-
-# Assuming kerberos.py is in the same directory or Python path
-try:
-    from kerberos import (
-        KerberosClient,
-        jprint,
-    )  # Make sure jprint is defined or remove if not needed
-except ImportError:
-    print(
-        "Warning: Could not import KerberosClient or jprint. Ensure kerberos.py is accessible."
-    )
-
-    # Define dummy classes/functions if needed for script to load without kerberos
-    class KerberosClient:
-        def __init__(self):
-            self.username = (
-                "dummy_user"  # Add a dummy username for the main block print
-            )
-
-        def location(self, world_id):
-            print(f"Dummy: Getting start location for world {world_id}")
-            return "start_room_dummy"  # Return a dummy start room
-
-        def room_name(self, world_id, room_id):
-            print(f"Dummy: Getting name for room {room_id}")
-            if room_id == "start_room_dummy":
-                return "Start Room (Dummy)"
-            elif room_id == "neighbor_N":
-                return "North Room (Dummy)"
-            return f"Room {room_id} (Dummy)"
-
-        def call_method(self, method, **kwargs):
-            print(f"Dummy: Calling method {method} with args {kwargs}")
-            # Simulate some neighbors for dummy testing
-            world = kwargs.get("world_id")
-            room = kwargs.get("room")
-            direction = kwargs.get("direction")
-            if room == "start_room_dummy":
-                if direction == "N":
-                    return {"result": "neighbor_N"}
-                if direction == "E":
-                    return {"result": "neighbor_E"}
-            if room == "neighbor_N":
-                if direction == "N":
-                    return {
-                        "result": "neighbor_NN"
-                    }  # Simulate another room further north
-                # When coming from start_room_dummy (via 'N'), we'd normally check 'S'
-                # but the modified logic should skip it. If called without entry_dir logic,
-                # this would return to start:
-                if direction == "S":
-                    return {"result": "start_room_dummy"}
-            return {"result": None}  # Default: no neighbor
-
-    def jprint(x):
-        import json
-
-        print(json.dumps(x, indent=2))
+import json
+import time
+from kerberos import KerberosClient, jprint
+from maps import NAME_GRAPH
 
 
 DIRS = ["N", "W", "S", "E", "OUT", "IN", "UP", "DOWN"]
-# Dictionnaire pour trouver rapidement la direction opposée
 OPPOSITE_DIRS = {
     "N": "S",
     "S": "N",
@@ -71,151 +17,297 @@ OPPOSITE_DIRS = {
     "OUT": "IN",
 }
 
+# ==============================================================================
+# PHASE 1 : Construction du Graphe des Noms (à exécuter une fois)
+# ==============================================================================
 
-def get_all_rooms(
+
+def _build_name_graph_recursive(
     client: KerberosClient,
-    world_id,
-    current_location_id,
-    entry_direction=None,  # Nouvelle information: la direction utilisée pour ARRIVER ici
-    visited_locations=None,
-    room_cache=None,
+    world_id: str,
+    current_id: str,
+    entry_direction: str | None,
+    name_graph: dict,
+    visited_ids_build: set,
+    id_to_name_cache_build: dict,
 ):
-    """
-    Performs a Depth First Search to find all reachable rooms from a starting location,
-    avoiding immediate backtracking.
+    """Helper récursif pour construire le graphe des noms."""
+    if not current_id or current_id in visited_ids_build:
+        return
 
-    Args:
-        client: An initialized KerberosClient instance.
-        world_id: The ID of the world to search in.
-        current_location_id: The ID of the current room.
-        entry_direction: The direction used to enter the current_location_id (e.g., 'N').
-                         None for the starting room.
-        visited_locations: A set to keep track of visited room IDs (passed recursively).
-        room_cache: A list to accumulate (id, name) tuples (passed recursively).
+    visited_ids_build.add(current_id)
 
-    Returns:
-        A list of tuples, where each tuple is (room_id, room_name).
-        Returns an empty list on error or if client/world/location is invalid.
-    """
-    if visited_locations is None:
-        visited_locations = set()
-    if room_cache is None:
-        room_cache = []
+    # Obtenir le nom, utiliser le cache si possible
+    if current_id not in id_to_name_cache_build:
+        try:
+            current_name = client.room_name(world_id, current_id)
+            id_to_name_cache_build[current_id] = current_name
+        except Exception as e:
+            print(f"BUILD_GRAPH: Error getting name for {current_id}: {e}")
+            # Ne pas continuer si on ne peut pas obtenir le nom
+            return
+    else:
+        current_name = id_to_name_cache_build[current_id]
 
-    # Cas de base : emplacement invalide ou déjà visité entièrement
-    # Note: Même si on arrive par un chemin différent, si la salle a déjà été
-    # entièrement explorée (ajoutée à visited_locations), on s'arrête.
-    if not current_location_id or current_location_id in visited_locations:
-        return room_cache
-
-    visited_locations.add(current_location_id)
-
-    # Obtenir le nom de la salle (gérer les erreurs potentielles)
-    room_name = None
-    try:
-        room_name = client.room_name(world_id, current_location_id)
-        # print(f"DFS: Visiting {current_location_id} - Name: {room_name} (Arrived via: {entry_direction})") # Debug print
-    except Exception as e:
-        print(
-            f"Warning: Failed to get name for room {current_location_id} in world {world_id}: {e}"
-        )
-        room_name = current_location_id  # Utiliser l'ID comme nom de secours
-
-    # Ajouter la salle actuelle (ID, Nom) au cache
-    room_cache.append((current_location_id, room_name))
+    # Initialiser l'entrée dans le graphe si elle n'existe pas
+    if current_name not in name_graph:
+        name_graph[current_name] = {}
+        print(f"NEW ROOM : {current_name}")
 
     # Explorer les voisins
     for direction in DIRS:
-        # --- OPTIMISATION : Éviter le retour immédiat ---
-        # Si une direction d'entrée est connue et que la direction actuelle est son opposée,
-        # on saute cette direction car on vient de là.
-        if entry_direction and direction == OPPOSITE_DIRS.get(entry_direction):
-            # print(
-            #     f"  -> Skipping opposite direction {direction} (came from {entry_direction})"
-            # )  # Debug print
-            continue
-        # --- Fin de l'optimisation ---
+        # if entry_direction and direction == OPPOSITE_DIRS.get(entry_direction):
+        #     continue  # Optimisation: ne pas revenir en arrière immédiatement
 
         neighbor_id = None
         try:
+            # Appel API pour trouver le voisin
             neighbor_data = client.call_method(
                 "room.neighbor",
                 world_id=world_id,
-                room=current_location_id,
+                room=current_id,
                 direction=direction,
             )
             neighbor_id = (
                 neighbor_data.get("result") if isinstance(neighbor_data, dict) else None
             )
 
-            if neighbor_id and neighbor_id not in visited_locations:
-                # print(f"  -> Found neighbor {direction}: {neighbor_id}. Exploring...") # Debug print
-                # Appel récursif :
-                # - Passer le même ensemble visited_locations et la même liste room_cache
-                # - Indiquer que pour atteindre neighbor_id, on a utilisé 'direction'
-                get_all_rooms(
-                    client,
-                    world_id,
-                    neighbor_id,
-                    direction,  # La direction actuelle devient la direction d'entrée pour le voisin
-                    visited_locations,
-                    room_cache,
-                )
-            # elif neighbor_id:
-            #    print(f"  -> Neighbor {direction}: {neighbor_id} (already visited)") # Debug print
-            # else:
-            #    print(f"  -> No neighbor in direction {direction}") # Debug print
+            if neighbor_id:
+                # Obtenir le nom du voisin (potentiellement via cache)
+                if neighbor_id not in id_to_name_cache_build:
+                    try:
+                        neighbor_name = client.room_name(world_id, neighbor_id)
+                        id_to_name_cache_build[neighbor_id] = neighbor_name
+                    except Exception as e:
+                        print(
+                            f"BUILD_GRAPH: Error getting name for neighbor {neighbor_id}: {e}"
+                        )
+                        continue  # Ne pas ajouter ce voisin si son nom est inconnu
+                else:
+                    neighbor_name = id_to_name_cache_build[neighbor_id]
+
+                # Ajouter la connexion au graphe des noms
+                if (
+                    direction not in name_graph[current_name]
+                    or name_graph[current_name][direction] != neighbor_name
+                ):
+                    name_graph[current_name][direction] = neighbor_name
+                    # print(f"  -> Added link: {current_name} --{direction}--> {neighbor_name}") # Debug
+
+                # Appel récursif si le voisin n'a pas été visité par son ID
+                if neighbor_id not in visited_ids_build:
+                    _build_name_graph_recursive(
+                        client,
+                        world_id,
+                        neighbor_id,
+                        direction,
+                        name_graph,
+                        visited_ids_build,
+                        id_to_name_cache_build,
+                    )
 
         except Exception as e:
             print(
-                f"Error getting neighbor {direction} from {current_location_id} in {world_id}: {e}"
+                f"BUILD_GRAPH: Error getting neighbor {direction} from {current_id}: {e}"
             )
-            # Continuer le DFS même si un voisin échoue
-
-    # Le résultat final s'accumule dans room_cache à travers tous les appels récursifs
-    return room_cache
 
 
-if __name__ == "__main__":
-    print("Running DFS script as main...")
-    # Remplacez par un ID de monde valide auquel vous avez accès
-    test_world_id = (
-        "c89e87be37e427e86e9720fc6329bd6f"  # Remplacez par votre ID de monde réel
-        # "dummy_world" # Utilisez ceci si vous testez avec les classes factices
-    )
+def build_name_graph(client: KerberosClient, world_id: str) -> dict:
+    """
+    Construit un graphe des connexions entre salles basé sur leurs noms.
+    Ne doit être exécuté qu'une seule fois sur un monde de référence.
+    """
+    print(f"\n--- Building Name Graph using World: {world_id} ---")
+    start_time = time.time()
+    name_graph = {}
+    visited_ids_build = set()
+    id_to_name_cache_build = {}  # Cache ID -> Nom pour cette construction
 
     try:
-        k_client = KerberosClient()  # Assumes default credentials work or uses dummy
-        print(f"Initialized client for user: {k_client.username}")
+        start_location_id = client.location(world_id=world_id)
+        if not start_location_id:
+            print("BUILD_GRAPH: Error: Could not get starting location.")
+            return {}
 
-        start_location = k_client.location(world_id=test_world_id)
-        if not start_location:
-            print(f"Error: Could not get starting location for world {test_world_id}")
-        else:
-            print(
-                f"Starting DFS from location: {start_location} in world {test_world_id}"
-            )
-            # Appeler la fonction correctement, sans spécifier entry_direction pour le début
-            all_found_rooms = get_all_rooms(k_client, test_world_id, start_location)
+        print(f"BUILD_GRAPH: Starting from location ID: {start_location_id}")
+        _build_name_graph_recursive(
+            client,
+            world_id,
+            start_location_id,
+            None,
+            name_graph,
+            visited_ids_build,
+            id_to_name_cache_build,
+        )
 
-            print("\n--- DFS Result ---")
-            if all_found_rooms:
-                # L'utilisation de visited_locations empêche déjà les doublons DANS la liste finale
-                # car une salle visitée n'est pas ré-explorée.
-                print(f"Found {len(all_found_rooms)} unique rooms.")
-                print("Rooms (ID: Name):")
-                # Trier pour une sortie cohérente
-                sorted_rooms = sorted(all_found_rooms, key=lambda x: x[0])
-                for room_id, name in sorted_rooms:
-                    # Utiliser une f-string pour un formatage plus propre
-                    print(f"  - {room_id}: {name}")
-                # jprint(sorted_rooms) # Utiliser jprint si disponible et désiré
-            else:
-                print("No rooms found or DFS failed.")
-            print("------------------")
-
-    except Exception as main_err:
-        print(f"\nAn error occurred during direct script execution: {main_err}")
+    except Exception as e:
+        print(f"BUILD_GRAPH: An error occurred during graph building: {e}")
         import traceback
 
         traceback.print_exc()
+
+    end_time = time.time()
+    print(f"--- Name Graph Building Complete ({len(name_graph)} nodes) ---")
+    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    return name_graph
+
+
+# ==============================================================================
+# GRAPHE PRÉCALCULÉ (à remplir après l'exécution de build_name_graph)
+# ==============================================================================
+
+# METTEZ ICI LE RÉSULTAT DE L'APPEL À build_name_graph UNE FOIS QUE VOUS L'AUREZ EXÉCUTÉ
+# Exemple basé sur les Dummies :
+# NAME_GRAPH = {
+#     "Start Room (Dummy)": {"N": "North Room (Dummy)", "E": "East Room (Dummy)"},
+#     "North Room (Dummy)": {"N": "North North Room (Dummy)", "S": "Start Room (Dummy)"},
+#     "East Room (Dummy)": {"W": "Start Room (Dummy)"},
+#     "North North Room (Dummy)": {"S": "North Room (Dummy)"},
+# }
+
+# ==============================================================================
+# PHASE 2 : Exploration optimisée utilisant le Graphe des Noms
+# ==============================================================================
+
+
+def get_all_rooms(
+    client: KerberosClient, world_id: str, name_graph: dict = NAME_GRAPH
+) -> list[tuple[str, str]]:
+    """
+    Trouve toutes les salles accessibles en utilisant le graphe de noms précalculé
+    pour minimiser les appels API.
+    """
+    print(f"\n--- Optimized Discovery for World: {world_id} ---")
+    start_time = time.time()
+    if not name_graph:
+        print("OPTIMIZED: Error - Name graph is empty. Cannot proceed.")
+        return []
+
+    result_rooms = []  # Liste pour stocker les tuples (id, name) trouvés
+    name_to_id_map = {}  # Cache Nom -> ID pour CE monde
+    visited_names = set()  # Noms des salles déjà traitées pour CE monde
+    queue = []  # File pour l'exploration (BFS sur le graphe de noms)
+
+    api_calls = {"location": 0, "room_name": 0, "neighbor": 0}
+
+    try:
+        # 1. Obtenir le point de départ
+        api_calls["location"] += 1
+        start_id = client.location(world_id=world_id)
+        if not start_id:
+            print("OPTIMIZED: Error: Could not get starting location.")
+            return []
+
+        # 2. Obtenir le nom de départ
+        api_calls["room_name"] += 1
+        start_name = client.room_name(world_id, start_id)
+        print(f"starting room : {start_name}")
+
+        # 3. Initialiser l'exploration
+        if start_name not in name_graph:
+            print(
+                f"OPTIMIZED: Warning - Start room name '{start_name}' not found in the precomputed graph."
+            )
+            # On ajoute quand même la salle de départ mais on ne pourra pas explorer plus loin via le graphe
+            result_rooms.append((start_id, start_name))
+        else:
+            print(f"OPTIMIZED: Starting from '{start_name}' (ID: {start_id})")
+            name_to_id_map[start_name] = start_id
+            visited_names.add(start_name)
+            result_rooms.append((start_id, start_name))
+            queue.append(start_name)  # On met le nom dans la file
+
+        # 4. Exploration BFS guidée par le graphe de noms
+        while queue:
+            current_name = queue.pop(0)
+            current_id = name_to_id_map[current_name]
+
+            # Consulter les voisins connus dans le graphe de noms
+            neighbors_in_graph = name_graph.get(current_name, {})
+            # print(f"  Exploring neighbors of '{current_name}' (ID: {current_id})") # Debug
+
+            for direction, neighbor_name in neighbors_in_graph.items():
+                # Si on a déjà traité ce NOM de voisin pour ce monde, on passe
+                if neighbor_name in visited_names:
+                    # print(f"    - Neighbor {direction}: '{neighbor_name}' (already processed)") # Debug
+                    continue
+
+                # Si le nom du voisin n'est pas dans le graphe principal (peu probable mais sécurité)
+                if neighbor_name not in name_graph:
+                    print(
+                        f"OPTIMIZED: Warning - Neighbor name '{neighbor_name}' found via graph from '{current_name}' but not present as a node in the graph itself. Skipping."
+                    )
+                    continue
+
+                # On doit trouver l'ID de ce voisin DANS CE MONDE
+                # C'est ici qu'on fait l'appel API crucial mais ciblé
+                neighbor_id = None
+                try:
+                    # print(f"    - Checking neighbor {direction}: '{neighbor_name}'. Making API call...") # Debug
+                    api_calls["neighbor"] += 1
+                    neighbor_data = client.room_neighbor(
+                        world_id=world_id,
+                        room=current_id,
+                        direction=direction,
+                    )
+                    neighbor_id = (
+                        neighbor_data.get("result")
+                        if isinstance(neighbor_data, dict)
+                        else None
+                    )
+
+                    if neighbor_id:
+                        # Vérification optionnelle mais recommandée : le nom correspond-il ?
+                        # api_calls['room_name'] += 1 # Uncomment if doing verification
+                        # actual_neighbor_name = client.room_name(world_id, neighbor_id)
+                        # if actual_neighbor_name != neighbor_name:
+                        #     print(f"OPTIMIZED: WARNING! Name mismatch for neighbor {direction} of {current_id}.")
+                        #     print(f"  Graph expected '{neighbor_name}', API returned ID {neighbor_id} with name '{actual_neighbor_name}'")
+                        #     # Décider quoi faire : ignorer, utiliser le nom réel, etc.
+                        #     # Pour l'instant, on se fie au graphe et on ajoute, mais on marque comme visité
+                        #     # neighbor_name = actual_neighbor_name # Ou utiliser le nom réel trouvé
+
+                        # On a trouvé l'ID !
+                        # print(f"      Found ID: {neighbor_id}") # Debug
+                        name_to_id_map[neighbor_name] = neighbor_id
+                        visited_names.add(neighbor_name)
+                        result_rooms.append((neighbor_id, neighbor_name))
+                        queue.append(
+                            neighbor_name
+                        )  # Ajouter le nom à la file pour exploration future
+                        print(f"room found: {neighbor_name}")
+
+                    else:
+                        # Le graphe indiquait un voisin, mais l'API dit non. Incohérence possible.
+                        print(
+                            f"OPTIMIZED: Warning - Graph expected neighbor '{neighbor_name}' in direction {direction} from '{current_name}' (ID: {current_id}), but API returned no neighbor."
+                        )
+
+                except Exception as e:
+                    print(
+                        f"OPTIMIZED: Error getting neighbor {direction} from {current_id} (expected name '{neighbor_name}'): {e}"
+                    )
+                    # Ne pas ajouter ce voisin si l'API échoue
+
+    except Exception as e:
+        print(f"OPTIMIZED: An error occurred during optimized discovery: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+    end_time = time.time()
+    print(f"--- Optimized Discovery Complete ({len(result_rooms)} rooms found) ---")
+    print(
+        f"API Calls: Location={api_calls['location']}, RoomName={api_calls['room_name']}, Neighbor={api_calls['neighbor']}"
+    )
+    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    return result_rooms
+
+
+if __name__ == "__main__":
+    client = KerberosClient()
+    world = "021a731976fd9431e4d1548ee8dfee76"
+    graph = build_name_graph(client, world)
+    jprint(graph)
+    # rooms = get_all_rooms(client, world)
+    # jprint(rooms)

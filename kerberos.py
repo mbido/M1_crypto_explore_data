@@ -302,6 +302,14 @@ class KerberosClient:
     def room_name(self, world_id, room):
         return self.call_method("room.name", world_id=world_id, room=room)
 
+    def room_neighbor(self, world_id, room, direction):
+        return self.call_method(
+            "room.neighbor",
+            world_id=world_id,
+            room=room,
+            direction=direction,
+        )
+
     def chip_whisperer(self, world_id, ciphertexts):
         return self.call_method(
             "chip.whisperer", world_id=world_id, ciphertexts=ciphertexts
