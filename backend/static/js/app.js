@@ -163,53 +163,60 @@ document
           // teleport section
           function renderDashboard(stats) {
             content.innerHTML = `
-              <h1 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Dashboard</h1>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
-                      <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Utilisateurs Uniques</h2>
-                      <p class="text-4xl font-bold text-gray-900 dark:text-white">${
+      <h1 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white">Dashboard</h1>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Utilisateurs Uniques</h2>
+              <p class="text-4xl font-bold text-gray-900 dark:text-white">${
                 stats?.users ?? 'N/A'}</p>
-                  </div>
-                  <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
-                      <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Mondes Enregistrés</h2>
-                      <p class="text-4xl font-bold text-gray-900 dark:text-white">${
+          </div>
+          <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Mondes Enregistrés</h2>
+              <p class="text-4xl font-bold text-gray-900 dark:text-white">${
                 stats?.worlds ?? 'N/A'}</p>
-                  </div>
-                  <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
-                      <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Bases de Flags Uniques</h2>
-                      <p class="text-4xl font-bold text-gray-900 dark:text-white">${
+          </div>
+          <div class="bg-white dark:bg-light-navy p-6 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-gray-700 dark:text-light-slate mb-2">Bases de Flags Uniques</h2>
+              <p class="text-4xl font-bold text-gray-900 dark:text-white">${
                 stats?.flags ?? 'N/A'}</p>
-                  </div>
-              </div>
+          </div>
+      </div>
 
-              <!-- NOUVELLE SECTION TÉLÉPORTATION -->
-              <div id="teleport" class="mt-8 p-6 bg-white dark:bg-light-navy rounded-lg shadow-md">
-                  <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
-                      <i class="fas fa-rocket mr-2 text-green"></i>Téléportation Rapide
-                  </h2>
-                  <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-end mb-4">
-                       <div class="flex-grow w-full sm:w-auto">
-                           <label for="worldIdInput" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">ID du Monde</label>
-                           <input type="text" id="worldIdInput" placeholder="Entrez l'ID du monde..." class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white focus:outline-none focus:ring-2 focus:ring-green focus:border-transparent">
-                       </div>
-                       <button id="findRoomsButton" class="py-2 px-4 bg-green text-navy font-medium rounded hover:bg-opacity-80 transition duration-150 ease-in-out dark:text-navy flex-shrink-0 w-full sm:w-auto">
-                           <i class="fas fa-search-location mr-2"></i>Chercher Salles Accessibles
-                       </button>
-                  </div>
-                  <div id="teleportStatus" class="mt-4 text-sm mb-4"></div>
-                  <h3 class="text-lg font-semibold mb-3 text-gray-700 dark:text-light-slate">Salles Accessibles :</h3>
-                  <div id="reachableRoomsContainer" class="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      <p class="text-gray-500 dark:text-slate italic col-span-full text-center py-4">
-                         Entrez un ID de monde et cliquez sur "Chercher Salles Accessibles".
-                      </p>
-                  </div>
-              </div>
-              <!-- FIN SECTION TÉLÉPORTATION -->
-          `;
+      <div id="teleport" class="mt-8 p-6 bg-white dark:bg-light-navy rounded-lg shadow-md">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
+              <i class="fas fa-rocket mr-2 text-green"></i>Téléportation Rapide
+          </h2>
+          <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-end mb-4">
+               <div class="flex-grow w-full sm:w-auto">
+                   <label for="worldIdInput" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">ID du Monde</label>
+                   <input type="text" id="worldIdInput" placeholder="Entrez l'ID du monde..." class="w-full p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white focus:outline-none focus:ring-2 focus:ring-green focus:border-transparent">
+               </div>
+               <button id="findRoomsButton" class="py-2 px-4 bg-green text-navy font-medium rounded hover:bg-opacity-80 transition duration-150 ease-in-out dark:text-navy flex-shrink-0 w-full sm:w-auto">
+                   <i class="fas fa-search-location mr-2"></i>Chercher Salles Accessibles
+               </button>
+          </div>
+          <div id="teleportStatus" class="mt-4 text-sm mb-4"></div>
+
+          <div class="mb-4">
+               <label for="teleportSearchInput" class="block text-sm font-medium text-gray-700 dark:text-light-slate mb-1">Filtrer les salles</label>
+               <input type="search" id="teleportSearchInput" placeholder="Rechercher par nom ou ID..." class="w-full md:w-1/2 p-2 border border-gray-300 rounded dark:bg-lightest-navy dark:border-slate dark:text-white focus:outline-none focus:ring-2 focus:ring-green focus:border-transparent">
+          </div>
+          <h3 class="text-lg font-semibold mb-3 text-gray-700 dark:text-light-slate">Salles Accessibles :</h3>
+          <div id="reachableRoomsContainer" class="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <p class="text-gray-500 dark:text-slate italic col-span-full text-center py-4">
+                 Entrez un ID de monde et cliquez sur "Chercher Salles Accessibles".
+              </p>
+          </div>
+          <p id="teleportNoResults" class="text-gray-500 dark:text-slate italic mt-4 hidden text-center">
+              Aucune salle trouvée correspondant à votre recherche.
+          </p>
+           </div>
+      `;
             // Ré-attacher les listeners spécifiques à cette vue
             attachTeleportElements();  // IMPORTANT: Attacher après rendu HTML
             hideLoading();
           }
+
 
           // --- Fonctions UserList, UserDetail, Compare (inchangées) ---
           function generateUserTableRows(users) {
@@ -1424,19 +1431,27 @@ document
             }
           }  // --- Fin de handleRoomCardClick ---
 
-          // Attacher les écouteurs aux éléments de téléportation (doit être
-          // appelé après rendu HTML)
+          // Dans backend/static/js/app.js
+
           function attachTeleportElements() {
             const findRoomsBtn = document.getElementById('findRoomsButton');
             const roomsContainer =
                 document.getElementById('reachableRoomsContainer');
             const statusDiv = document.getElementById('teleportStatus');
             const worldIdInput = document.getElementById('worldIdInput');
+            // *** DEBUT : Ajout des références pour la recherche ***
+            const searchInput = document.getElementById('teleportSearchInput');
+            const noResultsMessage =
+                document.getElementById('teleportNoResults');
+            // *** FIN : Ajout des références pour la recherche ***
 
-            if (findRoomsBtn && roomsContainer && statusDiv && worldIdInput) {
-              console.log('Attaching teleport listeners...');
-              // Utiliser replaceWith(cloneNode(true)) pour éviter les listeners
-              // multiples si appelé plusieurs fois
+
+            // *** MODIFIÉ : Inclure searchInput et noResultsMessage dans la
+            // vérification ***
+            if (findRoomsBtn && roomsContainer && statusDiv && worldIdInput &&
+                searchInput && noResultsMessage) {
+              console.log('Attaching teleport listeners including search...');
+
               const newFindRoomsBtn = findRoomsBtn.cloneNode(true);
               findRoomsBtn.parentNode.replaceChild(
                   newFindRoomsBtn, findRoomsBtn);
@@ -1450,10 +1465,14 @@ document
                   return;
                 }
 
-                // Stocker le worldId pour les clics sur les cartes
-                currentTeleportWorldId = worldId;
+                // *** DEBUT : Réinitialisation de la recherche ***
+                searchInput.value = '';  // Vider le champ de recherche
+                noResultsMessage.classList.add(
+                    'hidden');  // Cacher le message "aucun résultat"
+                // *** FIN : Réinitialisation de la recherche ***
 
-                roomsContainer.innerHTML = '';  // Vider les cartes précédentes
+                currentTeleportWorldId = worldId;
+                roomsContainer.innerHTML = '';
                 statusDiv.innerHTML =
                     `<div class="status-message status-info"><i class="fas fa-spinner fa-spin mr-2"></i>Recherche des salles accessibles pour le monde ${
                         worldId}...</div>`;
@@ -1461,40 +1480,73 @@ document
                 newFindRoomsBtn.classList.add('button-loading');
 
                 try {
-                  // Appel à l'API pour obtenir les salles via DFS
-                  // L'API retourne directement la liste [{id: ..., name: ...}]
                   const rooms = await fetchData(`/reachable_rooms?world_id=${
                       encodeURIComponent(worldId)}`);
-
-                  // La réponse est déjà la liste attendue par
-                  // displayReachableRooms
                   displayReachableRooms(rooms, roomsContainer, statusDiv);
+
+                  // *** DEBUT : Appliquer le filtre initial si nécessaire ***
+                  // Si l'utilisateur avait déjà tapé quelque chose avant de
+                  // cliquer (peu probable mais par sécurité)
+                  filterRoomCards();
+                  // *** FIN : Appliquer le filtre initial ***
 
                 } catch (error) {
                   console.error(
                       'Erreur lors de la récupération des salles accessibles:',
                       error);
-                  statusDiv.innerHTML =
-                      `<div class="status-message status-error">Erreur lors de la recherche: ${
-                          error.message} ${
-                          error.status ? `(${error.status})` : ''}</div>`;
-                  roomsContainer.innerHTML =
-                      `<p class="text-gray-500 dark:text-slate italic col-span-full text-center py-4">Impossible de charger les salles.</p>`;
+                  statusDiv.innerHTML = '';
+                  roomsContainer.innerHTML = '';
                 } finally {
                   newFindRoomsBtn.disabled = false;
                   newFindRoomsBtn.classList.remove('button-loading');
                 }
               });
+
+              // *** DEBUT : Ajout du listener et de la fonction de filtrage ***
+              searchInput.addEventListener('input', filterRoomCards);
+
+              function filterRoomCards() {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                const cards = roomsContainer.querySelectorAll('.room-card');
+                let visibleCount = 0;
+
+                cards.forEach(card => {
+                  const cardText = card.textContent?.toLowerCase() || '';
+                  const cardTitle = card.title?.toLowerCase() ||
+                      '';  // Recherche aussi dans le tooltip (ID: ...)
+                  const isVisible = cardText.includes(searchTerm) ||
+                      cardTitle.includes(searchTerm);
+
+                  card.style.display = isVisible ? '' : 'none';
+                  if (isVisible) {
+                    visibleCount++;
+                  }
+                });
+
+                noResultsMessage.classList.toggle(
+                    'hidden',
+                    visibleCount > 0 ||
+                        cards.length ===
+                            0);  // Cacher si visible ou si pas de carte
+              }
+              // *** FIN : Ajout du listener et de la fonction de filtrage ***
+
+
             } else {
-              // Ce log peut apparaître si la section #teleport n'est pas dans
-              // le DOM lors de l'appel
               console.warn(
-                  'Éléments DOM pour la téléportation non trouvés lors de attachTeleportElements.');
+                  'Éléments DOM pour la téléportation ou la recherche non trouvés lors de attachTeleportElements.');
+              // Lister les éléments manquants pour le débogage
+              if (!findRoomsBtn) console.warn('Manquant: #findRoomsButton');
+              if (!roomsContainer)
+                console.warn('Manquant: #reachableRoomsContainer');
+              if (!statusDiv) console.warn('Manquant: #teleportStatus');
+              if (!worldIdInput) console.warn('Manquant: #worldIdInput');
+              if (!searchInput)
+                console.warn('Manquant: #teleportSearchInput');  // Ajouté
+              if (!noResultsMessage)
+                console.warn('Manquant: #teleportNoResults');  // Ajouté
             }
           }
-          // Appel initial pour attacher les listeners (si la page charge
-          // directement sur une vue avec la section) attachTeleportElements();
-          // // Sera appelé dans handleRouteChange après le rendu
 
           // ==============================================
           // === FIN LOGIQUE TÉLÉPORTATION ================

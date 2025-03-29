@@ -5,7 +5,25 @@ from kerberos import KerberosClient, jprint
 from maps import NAME_GRAPH
 
 
-DIRS = ["N", "W", "S", "E", "OUT", "IN", "UP", "DOWN"]
+DIRS = [
+    "N",
+    "W",
+    "S",
+    "E",
+    "OUT",
+    "IN",
+    "UP",
+    "DOWN",
+    "EVE",
+    "ISIR",
+    "ZAMANSKI",
+    "TUMULUS",
+    "TIPI",
+    "PATIO",
+    "SALLE",
+    "TME",
+    "TÉLÉPORTEUR",
+]
 OPPOSITE_DIRS = {
     "N": "S",
     "S": "N",
@@ -306,8 +324,9 @@ def get_all_rooms(
 
 if __name__ == "__main__":
     client = KerberosClient()
-    world = "021a731976fd9431e4d1548ee8dfee76"
+    world = "ed28bf52fd0b6bc2178cb9ae81c199c9"
     graph = build_name_graph(client, world)
     jprint(graph)
+    print(len(graph))
     # rooms = get_all_rooms(client, world)
     # jprint(rooms)
