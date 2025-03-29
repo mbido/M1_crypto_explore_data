@@ -145,6 +145,7 @@ KERBERIZED_METHODS = [
     "protagonist.move",
     "protagonist.think",
     "room.neighbor",
+    "room.directions",
     "world.create",
 ]
 
@@ -314,11 +315,15 @@ class KerberosClient:
     def room_name(self, world_id, room):
         return self.call_method("room.name", world_id=world_id, room=room)
 
-    # {'signature': '(world_id: str, room: str, direction: str) -> Optional[str]', 'doc': 'Return the room reachable by moving in "direction" from the given room.\nReturn None if it is impossible to do this move.', 'kerberized': True, 'restricted': False}
     def room_neighbor(self, world_id, room, direction):
         return self.call_method(
             "room.neighbor", world_id=world_id, room=room, direction=direction
-        )
+        )["result"]
+
+    def room_directions(self, world_id, room):
+        return self.call_method("room.directions", world_id=world_id, room=room)[
+            "result"
+        ]
 
     def chip_whisperer(self, world_id, ciphertexts):
         return self.call_method(

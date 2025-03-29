@@ -1,42 +1,17 @@
 # -*- coding: utf-8 -*-
 import json
 import time
-from kerberos import KerberosClient, jprint
-from maps import NAME_GRAPH
-
-
-DIRS = [
-    "N",
-    "W",
-    "S",
-    "E",
-    "OUT",
-    "IN",
-    "UP",
-    "DOWN",
-    "EVE",
-    "ISIR",
-    "ZAMANSKI",
-    "TUMULUS",
-    "TIPI",
-    "PATIO",
-    "SALLE",
-    "TME",
-    "TÉLÉPORTEUR",
-]
-OPPOSITE_DIRS = {
-    "N": "S",
-    "S": "N",
-    "W": "E",
-    "E": "W",
-    "UP": "DOWN",
-    "DOWN": "UP",
-    "IN": "OUT",
-    "OUT": "IN",
-}
+from kerberos import (
+    KerberosClient,
+    jprint,
+)  # Assurez-vous que KerberosClient est bien importé
+from maps import (
+    NAME_GRAPH,
+)  # Importe votre graphe statique (si vous l'utilisez toujours comme base/fallback)
+import traceback  # Importé pour la gestion d'erreurs
 
 # ==============================================================================
-# PHASE 1 : Construction du Graphe des Noms (à exécuter une fois)
+# PHASE 1 : Construction du Graphe des Noms (Modifiée)
 # ==============================================================================
 
 
@@ -44,12 +19,12 @@ def _build_name_graph_recursive(
     client: KerberosClient,
     world_id: str,
     current_id: str,
-    entry_direction: str | None,
     name_graph: dict,
     visited_ids_build: set,
     id_to_name_cache_build: dict,
+    api_calls_build: dict,  # Ajout pour compter les appels API
 ):
-    """Helper récursif pour construire le graphe des noms."""
+    """Helper récursif pour construire le graphe des noms en utilisant room.directions."""
     if not current_id or current_id in visited_ids_build:
         return
 
@@ -58,59 +33,85 @@ def _build_name_graph_recursive(
     # Obtenir le nom, utiliser le cache si possible
     if current_id not in id_to_name_cache_build:
         try:
+            api_calls_build["room_name"] = api_calls_build.get("room_name", 0) + 1
             current_name = client.room_name(world_id, current_id)
             id_to_name_cache_build[current_id] = current_name
         except Exception as e:
             print(f"BUILD_GRAPH: Error getting name for {current_id}: {e}")
-            # Ne pas continuer si on ne peut pas obtenir le nom
-            return
+            return  # Ne pas continuer si on ne peut pas obtenir le nom
     else:
         current_name = id_to_name_cache_build[current_id]
 
     # Initialiser l'entrée dans le graphe si elle n'existe pas
     if current_name not in name_graph:
         name_graph[current_name] = {}
-        print(f"NEW ROOM : {current_name}")
+        print(f"NEW ROOM DISCOVERED : {current_name} (ID: {current_id})")
 
-    # Explorer les voisins
-    for direction in DIRS:
-        # if entry_direction and direction == OPPOSITE_DIRS.get(entry_direction):
-        #     continue  # Optimisation: ne pas revenir en arrière immédiatement
+    # --- NOUVELLE LOGIQUE : Utiliser room.directions ---
+    valid_directions = []
+    try:
+        # Appel API Kerberisé pour obtenir les directions valides
+        api_calls_build["room.directions"] = (
+            api_calls_build.get("room.directions", 0) + 1
+        )
+        # Utilise room_directions() pour plus de clarté si vous l'ajoutez à KerberosClient, sinon call_method
+        directions_result = client.room_directions(world_id=world_id, room=current_id)
+
+        if isinstance(directions_result, list):
+            valid_directions = directions_result
+        else:
+            print(
+                f"BUILD_GRAPH: Warning - room.directions for {current_id} did not return a list. Got: {type(directions_result)} - Value: {directions_result}"
+            )
+
+    except Exception as e:
+        print(f"BUILD_GRAPH: Error calling room.directions for {current_id}: {e}")
+        # Peut-être un monde inactif ou une erreur API. On continue sans explorer depuis ici.
+
+    # --- FIN NOUVELLE LOGIQUE ---
+
+    # Explorer les voisins VALIDES uniquement
+    for direction in valid_directions:
 
         neighbor_id = None
         try:
-            # Appel API pour trouver le voisin
-            neighbor_data = client.call_method(
-                "room.neighbor",
+            # Appel API pour trouver l'ID du voisin (Kerberisé)
+            api_calls_build["room.neighbor"] = (
+                api_calls_build.get("room.neighbor", 0) + 1
+            )
+            neighbor_id = client.room_neighbor(  # Utilisation de la méthode spécifique
                 world_id=world_id,
                 room=current_id,
                 direction=direction,
             )
-            neighbor_id = (
-                neighbor_data.get("result") if isinstance(neighbor_data, dict) else None
-            )
+
+            # room_neighbor retourne directement l'ID ou None
 
             if neighbor_id:
                 # Obtenir le nom du voisin (potentiellement via cache)
                 if neighbor_id not in id_to_name_cache_build:
                     try:
+                        api_calls_build["room_name"] = (
+                            api_calls_build.get("room_name", 0) + 1
+                        )
                         neighbor_name = client.room_name(world_id, neighbor_id)
                         id_to_name_cache_build[neighbor_id] = neighbor_name
+
                     except Exception as e:
                         print(
-                            f"BUILD_GRAPH: Error getting name for neighbor {neighbor_id}: {e}"
+                            f"BUILD_GRAPH: Error getting name for neighbor {neighbor_id} (from {current_id} via {direction}): {e}"
                         )
                         continue  # Ne pas ajouter ce voisin si son nom est inconnu
                 else:
                     neighbor_name = id_to_name_cache_build[neighbor_id]
 
-                # Ajouter la connexion au graphe des noms
+                # Ajouter la connexion au graphe des noms si elle n'existe pas ou est différente
+                # Utilisation de .get() pour éviter un KeyError potentiel si current_name vient juste d'être ajouté
                 if (
-                    direction not in name_graph[current_name]
+                    direction not in name_graph.get(current_name, {})
                     or name_graph[current_name][direction] != neighbor_name
                 ):
                     name_graph[current_name][direction] = neighbor_name
-                    # print(f"  -> Added link: {current_name} --{direction}--> {neighbor_name}") # Debug
 
                 # Appel récursif si le voisin n'a pas été visité par son ID
                 if neighbor_id not in visited_ids_build:
@@ -118,55 +119,67 @@ def _build_name_graph_recursive(
                         client,
                         world_id,
                         neighbor_id,
-                        direction,
                         name_graph,
                         visited_ids_build,
                         id_to_name_cache_build,
+                        api_calls_build,  # Passer le compteur
                     )
+            # else: Si neighbor_id est None, l'API n'a pas trouvé de voisin dans cette direction (peut arriver même si listée)
 
         except Exception as e:
+            # Gère les erreurs spécifiques à l'appel room.neighbor pour cette direction
             print(
-                f"BUILD_GRAPH: Error getting neighbor {direction} from {current_id}: {e}"
+                f"BUILD_GRAPH: Error getting neighbor {direction} from {current_id} (after directions check): {e}"
             )
+            # On continue avec la prochaine direction valide
 
 
 def build_name_graph(client: KerberosClient, world_id: str) -> dict:
     """
-    Construit un graphe des connexions entre salles basé sur leurs noms.
-    Ne doit être exécuté qu'une seule fois sur un monde de référence.
+    Construit un graphe des connexions entre salles basé sur leurs noms,
+    en utilisant room.directions pour optimiser.
     """
-    print(f"\n--- Building Name Graph using World: {world_id} ---")
+    print(f"\n--- Building Optimized Name Graph using World: {world_id} ---")
     start_time = time.time()
     name_graph = {}
     visited_ids_build = set()
     id_to_name_cache_build = {}  # Cache ID -> Nom pour cette construction
+    # Initialisation du compteur d'appels API pour la construction
+    api_calls_build = {
+        "room.directions": 0,
+        "room.neighbor": 0,
+        "room_name": 0,
+        "location": 0,
+    }
 
     try:
+        api_calls_build["location"] += 1
         start_location_id = client.location(world_id=world_id)
         if not start_location_id:
             print("BUILD_GRAPH: Error: Could not get starting location.")
             return {}
 
         print(f"BUILD_GRAPH: Starting from location ID: {start_location_id}")
+        # Lancer la récursion avec le compteur d'appels
         _build_name_graph_recursive(
             client,
             world_id,
             start_location_id,
-            None,
             name_graph,
             visited_ids_build,
             id_to_name_cache_build,
+            api_calls_build,  # Passer le compteur
         )
 
     except Exception as e:
         print(f"BUILD_GRAPH: An error occurred during graph building: {e}")
-        import traceback
-
         traceback.print_exc()
 
     end_time = time.time()
-    print(f"--- Name Graph Building Complete ({len(name_graph)} nodes) ---")
-    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    print(f"--- Optimized Name Graph Building Complete ({len(name_graph)} nodes) ---")
+    # Afficher le compte des appels API de la phase de construction
+    print(f"API Calls (Build Phase): {api_calls_build}")
+    print(f"Time taken (Build Phase): {end_time - start_time:.2f} seconds")
     return name_graph
 
 
@@ -175,16 +188,11 @@ def build_name_graph(client: KerberosClient, world_id: str) -> dict:
 # ==============================================================================
 
 # METTEZ ICI LE RÉSULTAT DE L'APPEL À build_name_graph UNE FOIS QUE VOUS L'AUREZ EXÉCUTÉ
-# Exemple basé sur les Dummies :
-# NAME_GRAPH = {
-#     "Start Room (Dummy)": {"N": "North Room (Dummy)", "E": "East Room (Dummy)"},
-#     "North Room (Dummy)": {"N": "North North Room (Dummy)", "S": "Start Room (Dummy)"},
-#     "East Room (Dummy)": {"W": "Start Room (Dummy)"},
-#     "North North Room (Dummy)": {"S": "North Room (Dummy)"},
-# }
+# ou laissez l'import depuis maps.py si NAME_GRAPH y est défini
+# NAME_GRAPH = { ... } # Résultat de build_name_graph
 
 # ==============================================================================
-# PHASE 2 : Exploration optimisée utilisant le Graphe des Noms
+# PHASE 2 : Exploration optimisée utilisant le Graphe des Noms (Inchangée)
 # ==============================================================================
 
 
@@ -193,140 +201,173 @@ def get_all_rooms(
 ) -> list[tuple[str, str]]:
     """
     Trouve toutes les salles accessibles en utilisant le graphe de noms précalculé
-    pour minimiser les appels API.
+    pour minimiser les appels API. (Fonction globalement inchangée)
     """
-    print(f"\n--- Optimized Discovery for World: {world_id} ---")
+    print(
+        f"\n--- Optimized Discovery for World: {world_id} using precomputed graph ---"
+    )
     start_time = time.time()
     if not name_graph:
-        print("OPTIMIZED: Error - Name graph is empty. Cannot proceed.")
+        print("OPTIMIZED: Error - Name graph is empty or not provided. Cannot proceed.")
         return []
 
-    result_rooms = []  # Liste pour stocker les tuples (id, name) trouvés
-    name_to_id_map = {}  # Cache Nom -> ID pour CE monde
-    visited_names = set()  # Noms des salles déjà traitées pour CE monde
-    queue = []  # File pour l'exploration (BFS sur le graphe de noms)
-
-    api_calls = {"location": 0, "room_name": 0, "neighbor": 0}
+    result_rooms = []
+    name_to_id_map = {}
+    visited_names = set()
+    queue = []
+    # Compteur séparé pour la phase de découverte
+    api_calls_discovery = {"location": 0, "room_name": 0, "neighbor": 0}
 
     try:
-        # 1. Obtenir le point de départ
-        api_calls["location"] += 1
+        api_calls_discovery["location"] += 1
         start_id = client.location(world_id=world_id)
         if not start_id:
             print("OPTIMIZED: Error: Could not get starting location.")
             return []
 
-        # 2. Obtenir le nom de départ
-        api_calls["room_name"] += 1
+        api_calls_discovery["room_name"] += 1
         start_name = client.room_name(world_id, start_id)
-        print(f"starting room : {start_name}")
 
-        # 3. Initialiser l'exploration
         if start_name not in name_graph:
             print(
-                f"OPTIMIZED: Warning - Start room name '{start_name}' not found in the precomputed graph."
+                f"OPTIMIZED: Warning - Start room name '{start_name}' (ID: {start_id}) not found in the precomputed graph. Adding only this room."
             )
-            # On ajoute quand même la salle de départ mais on ne pourra pas explorer plus loin via le graphe
             result_rooms.append((start_id, start_name))
+            # Ne pas ajouter à la file si le nom n'est pas dans le graphe
         else:
             print(f"OPTIMIZED: Starting from '{start_name}' (ID: {start_id})")
             name_to_id_map[start_name] = start_id
             visited_names.add(start_name)
             result_rooms.append((start_id, start_name))
-            queue.append(start_name)  # On met le nom dans la file
+            queue.append(start_name)
 
-        # 4. Exploration BFS guidée par le graphe de noms
         while queue:
             current_name = queue.pop(0)
+            # Vérifier si current_name existe dans name_to_id_map (sécurité)
+            if current_name not in name_to_id_map:
+                print(
+                    f"OPTIMIZED: Error - Name '{current_name}' in queue but not in name_to_id_map. Skipping."
+                )
+                continue
             current_id = name_to_id_map[current_name]
 
-            # Consulter les voisins connus dans le graphe de noms
+            # Consulter les voisins connus dans le graphe précalculé
             neighbors_in_graph = name_graph.get(current_name, {})
-            # print(f"  Exploring neighbors of '{current_name}' (ID: {current_id})") # Debug
 
             for direction, neighbor_name in neighbors_in_graph.items():
-                # Si on a déjà traité ce NOM de voisin pour ce monde, on passe
                 if neighbor_name in visited_names:
-                    # print(f"    - Neighbor {direction}: '{neighbor_name}' (already processed)") # Debug
-                    continue
+                    continue  # Déjà traité par son nom dans ce monde
 
-                # Si le nom du voisin n'est pas dans le graphe principal (peu probable mais sécurité)
+                # Vérifier si le nom du voisin existe comme clé dans le graphe (cohérence)
                 if neighbor_name not in name_graph:
                     print(
-                        f"OPTIMIZED: Warning - Neighbor name '{neighbor_name}' found via graph from '{current_name}' but not present as a node in the graph itself. Skipping."
+                        f"OPTIMIZED: Warning - Neighbor name '{neighbor_name}' (linked from '{current_name}') not found as a node in the graph. Skipping."
                     )
                     continue
 
-                # On doit trouver l'ID de ce voisin DANS CE MONDE
-                # C'est ici qu'on fait l'appel API crucial mais ciblé
                 neighbor_id = None
                 try:
-                    # print(f"    - Checking neighbor {direction}: '{neighbor_name}'. Making API call...") # Debug
-                    api_calls["neighbor"] += 1
-                    neighbor_data = client.room_neighbor(
-                        world_id=world_id,
-                        room=current_id,
-                        direction=direction,
-                    )
-                    neighbor_id = (
-                        neighbor_data.get("result")
-                        if isinstance(neighbor_data, dict)
-                        else None
+                    # Appel API ciblé pour obtenir l'ID du voisin dans ce monde spécifique
+                    api_calls_discovery["neighbor"] += 1
+                    neighbor_id = client.room_neighbor(
+                        world_id=world_id, room=current_id, direction=direction
                     )
 
                     if neighbor_id:
-                        # Vérification optionnelle mais recommandée : le nom correspond-il ?
-                        # api_calls['room_name'] += 1 # Uncomment if doing verification
-                        # actual_neighbor_name = client.room_name(world_id, neighbor_id)
-                        # if actual_neighbor_name != neighbor_name:
-                        #     print(f"OPTIMIZED: WARNING! Name mismatch for neighbor {direction} of {current_id}.")
-                        #     print(f"  Graph expected '{neighbor_name}', API returned ID {neighbor_id} with name '{actual_neighbor_name}'")
-                        #     # Décider quoi faire : ignorer, utiliser le nom réel, etc.
-                        #     # Pour l'instant, on se fie au graphe et on ajoute, mais on marque comme visité
-                        #     # neighbor_name = actual_neighbor_name # Ou utiliser le nom réel trouvé
+                        # Optionnel: Vérifier la correspondance du nom (peut coûter cher en appels room_name)
+                        # try:
+                        #     api_calls_discovery['room_name'] += 1
+                        #     actual_neighbor_name = client.room_name(world_id, neighbor_id)
+                        #     if actual_neighbor_name != neighbor_name:
+                        #         print(f"OPTIMIZED: WARNING! Name mismatch for neighbor {direction} of {current_id} / {current_name}.")
+                        #         print(f"  Graph expected '{neighbor_name}', API returned ID {neighbor_id} with name '{actual_neighbor_name}'")
+                        #         # Stratégie : faire confiance au graphe pour la navigation, mais loguer l'alerte.
+                        # except Exception as name_err:
+                        #      print(f"OPTIMIZED: Error verifying neighbor name for ID {neighbor_id}: {name_err}")
 
-                        # On a trouvé l'ID !
-                        # print(f"      Found ID: {neighbor_id}") # Debug
-                        name_to_id_map[neighbor_name] = neighbor_id
-                        visited_names.add(neighbor_name)
-                        result_rooms.append((neighbor_id, neighbor_name))
-                        queue.append(
-                            neighbor_name
-                        )  # Ajouter le nom à la file pour exploration future
-                        print(f"room found: {neighbor_name}")
+                        # Ajouter le voisin trouvé à la liste et à la file d'attente
+                        if (
+                            neighbor_name not in visited_names
+                        ):  # Double vérification avant ajout
+                            name_to_id_map[neighbor_name] = neighbor_id
+                            visited_names.add(neighbor_name)
+                            result_rooms.append((neighbor_id, neighbor_name))
+                            queue.append(neighbor_name)
+                            # print(f"  + Found and added room: {neighbor_name} ({neighbor_id}) via {direction}") # Debug
 
                     else:
-                        # Le graphe indiquait un voisin, mais l'API dit non. Incohérence possible.
+                        # Le graphe indiquait un voisin, mais l'API dit non.
+                        # Cela peut arriver si le monde exploré est différent de celui utilisé pour construire le graphe,
+                        # ou si le monde a changé.
                         print(
-                            f"OPTIMIZED: Warning - Graph expected neighbor '{neighbor_name}' in direction {direction} from '{current_name}' (ID: {current_id}), but API returned no neighbor."
+                            f"OPTIMIZED: Warning - Graph expected neighbor '{neighbor_name}' ({direction} from '{current_name}'), but API returned no neighbor in world {world_id}."
                         )
 
                 except Exception as e:
+                    # Gère les erreurs lors de l'appel à room_neighbor pendant la découverte
                     print(
                         f"OPTIMIZED: Error getting neighbor {direction} from {current_id} (expected name '{neighbor_name}'): {e}"
                     )
-                    # Ne pas ajouter ce voisin si l'API échoue
+                    # Ne pas ajouter ce voisin et continuer
 
     except Exception as e:
         print(f"OPTIMIZED: An error occurred during optimized discovery: {e}")
-        import traceback
-
         traceback.print_exc()
 
     end_time = time.time()
-    print(f"--- Optimized Discovery Complete ({len(result_rooms)} rooms found) ---")
+    # Utiliser len(visited_names) peut être plus précis pour le nombre de salles uniques découvertes
     print(
-        f"API Calls: Location={api_calls['location']}, RoomName={api_calls['room_name']}, Neighbor={api_calls['neighbor']}"
+        f"--- Optimized Discovery Complete ({len(visited_names)} unique rooms visited) ---"
     )
-    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    print(f"Total room entries in result list: {len(result_rooms)}")
+    print(f"API Calls (Discovery Phase): {api_calls_discovery}")
+    print(f"Time taken (Discovery Phase): {end_time - start_time:.2f} seconds")
     return result_rooms
 
 
 if __name__ == "__main__":
-    client = KerberosClient()
-    world = "ed28bf52fd0b6bc2178cb9ae81c199c9"
-    graph = build_name_graph(client, world)
-    jprint(graph)
-    print(len(graph))
-    # rooms = get_all_rooms(client, world)
-    # jprint(rooms)
+    try:
+        client = KerberosClient()
+        # Choisissez un world_id actif pour construire/tester
+        world_for_graph_build = (
+            "ed28bf52fd0b6bc2178cb9ae81c199c9"  # Mettez un ID valide et actif
+        )
+
+        # --- Étape 1: Construire le graphe optimisé ---
+        print("Building graph...")
+        # Cette fonction affiche maintenant ses propres compteurs d'API
+        optimized_graph = build_name_graph(client, world_for_graph_build)
+
+        # Optionnel : Afficher ou sauvegarder le graphe construit
+        # print("\nBuilt Graph Structure:")
+        # jprint(optimized_graph)
+        # print(f"\nTotal unique rooms (nodes) in built graph: {len(optimized_graph)}")
+        # Sauvegarde (exemple):
+        # with open("optimized_name_graph.json", "w", encoding="utf-8") as f:
+        #     json.dump(optimized_graph, f, indent=2, ensure_ascii=False)
+        # print("Graph saved to optimized_name_graph.json")
+
+        # --- Étape 2: Utiliser le graphe pour explorer ---
+        # Assurez-vous que get_all_rooms utilise le bon graphe.
+        # Vous pouvez soit remplacer NAME_GRAPH dans maps.py, soit passer le graphe directement.
+
+        print("\n---------------------\n")
+        print("Running optimized discovery using the built graph...")
+        world_to_explore = world_for_graph_build  # Explorer le même monde pour tester
+
+        # Utiliser le graphe fraîchement construit:
+        rooms = get_all_rooms(client, world_to_explore, name_graph=optimized_graph)
+
+        # Ou si vous avez mis à jour NAME_GRAPH dans maps.py ou en haut de ce fichier:
+        # NAME_GRAPH = optimized_graph # Met à jour la variable globale si besoin
+        # rooms = get_all_rooms(client, world_to_explore) # Utilise NAME_GRAPH
+
+        # Afficher un résumé des résultats de la découverte
+        # print("\nRooms found by get_all_rooms:")
+        # jprint(rooms) # Peut être très long
+        print(f"\nTotal room entries found by get_all_rooms: {len(rooms)}")
+        # Comparer les compteurs d'API entre build_name_graph et get_all_rooms
+
+    except Exception as main_err:
+        print(f"\nAn error occurred in the main execution block: {main_err}")
+        traceback.print_exc()
