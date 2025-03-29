@@ -10,6 +10,10 @@ document
           const darkModeToggle = document.getElementById('darkModeToggle');
           const updateDbButton = document.getElementById('updateDbButton');
           const updateStatusDiv = document.getElementById('updateStatus');
+          const updateWorldsButton =
+              document.getElementById('updateWorldsButton');
+          const updateWorldsStatusDiv =
+              document.getElementById('updateWorldsStatus');
           const notesArea = document.getElementById('notesArea');
           const API_BASE_URL =
               '/api';  // Assuming Flask runs on the same domain/port
@@ -1691,6 +1695,71 @@ document
           } else {
             console.warn(
                 'Le bouton d\'update (#updateDbButton) ou le div de statut (#updateStatus) n\'a pas été trouvé.');
+          }
+
+          // --- Gestion Bouton Update WORLDS ---
+
+          if (updateWorldsButton && updateWorldsStatusDiv) {
+            updateWorldsButton.addEventListener('click', async () => {
+              updateWorldsButton.disabled = true;
+              updateWorldsButton.classList.add('button-loading');
+              updateWorldsButton.innerHTML =
+                  '<i class="fas fa-map-marker-alt fa-spin mr-2 w-5 text-center"></i>MAJ Positions...';
+              updateWorldsStatusDiv.innerHTML =
+                  '<div class="status-message status-info text-xs p-1">Lancement MAJ positions...</div>';
+
+              try {
+                // Appel au NOUVEL endpoint API
+                const result = await fetchData(
+                    '/update-worlds', {method: 'POST'});  // Chemin corrigé
+
+                if (result && result.success) {
+                  updateWorldsStatusDiv.innerHTML =
+                      `<div class="status-message status-success text-xs p-1">
+                            <strong class="font-bold">Succès!</strong><br>
+                            <pre class="text-[0.7rem] whitespace-pre-wrap">${
+                          result.message ||
+                          'Mise à jour des positions terminée.'}</pre>
+                         </div>`;
+                  // Optionnel: rafraîchir la vue si nécessaire
+                  // setTimeout(handleRouteChange, 1500);
+                } else {
+                  const errorMessage =
+                      result?.error || 'Erreur inconnue serveur.';
+                  updateWorldsStatusDiv.innerHTML =
+                      `<div class="status-message status-error text-xs p-1">
+                            <strong class="font-bold">Échec!</strong><br>
+                            <pre class="text-[0.7rem] whitespace-pre-wrap">${
+                          errorMessage}</pre>
+                         </div>`;
+                }
+              } catch (error) {
+                console.error('Error during WORLDS update:', error);
+                updateWorldsStatusDiv.innerHTML =
+                    `<div class="status-message status-error text-xs p-1">
+                       <strong class="font-bold">Erreur!</strong><br>
+                       <pre class="text-[0.7rem] whitespace-pre-wrap">${
+                        error.message ||
+                        'Impossible de contacter le serveur.'}${
+                        error.status ? ` (Code: ${error.status})` : ''}</pre>
+                    </div>`;
+              } finally {
+                setTimeout(() => {
+                  if (updateWorldsButton) {
+                    updateWorldsButton.disabled = false;
+                    updateWorldsButton.classList.remove('button-loading');
+                    updateWorldsButton.innerHTML =
+                        '<i class="fas fa-map-marker-alt mr-2 w-5 text-center"></i>Actualiser Positions Joueurs';
+                  }
+                  // setTimeout(() => { if(updateWorldsStatusDiv)
+                  // updateWorldsStatusDiv.innerHTML = ''; }, 8000); // Clear
+                  // status later
+                }, 1000);
+              }
+            });
+          } else {
+            console.warn(
+                'Bouton MAJ positions (#updateWorldsButton) ou statut (#updateWorldsStatus) non trouvé.');
           }
 
 

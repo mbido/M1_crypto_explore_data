@@ -6,6 +6,9 @@ import sys
 import json
 from flask import Flask, jsonify, g, render_template, abort, request
 from flask_cors import CORS
+import datetime
+import tqdm
+
 
 # --- Import from kerberos.py ---
 SCRIPT_DIR_API = os.path.dirname(os.path.abspath(__file__))
@@ -371,9 +374,168 @@ def trigger_db_update():
         return jsonify({"success": False, "error": error_msg}), 500
 
 
+# --- NOUVELLE ROUTE: Update Worlds Only ---
+@app.route("/api/update-worlds", methods=["POST"])
+def trigger_worlds_update():
+    """
+    Scanne rapidement les mondes pour mettre à jour uniquement
+    la table 'worlds' (position des joueurs).
+    """
+    print("Début de la mise à jour rapide des positions (worlds)...")
+    processed_worlds = 0
+    updated_entries = 0
+    added_entries = 0
+    skipped_worlds = 0
+    error_count = 0
+
+    try:
+        client = KerberosClient()
+        world_list = client.list_worlds()
+        print(f"Scan de {len(world_list)} mondes...")
+
+        db = get_db()  # Récupère la connexion DB pour ce contexte de requête
+        cursor = db.cursor()
+
+        # Utilise tqdm pour une barre de progression côté serveur (optionnel)
+        for world_info in tqdm.tqdm(world_list, desc="Scanning Worlds", unit=" world"):
+            world_id = world_info[0]  # world_list contient des tuples/listes [id, ...]
+            user = None  # Réinitialiser pour chaque monde
+            try:
+                user = client.user_from_world(world_id)
+                if not user:
+                    # print(f"  -> Aucun utilisateur pour {world_id}, skip.")
+                    skipped_worlds += 1
+                    continue
+
+                location = client.location(world_id)
+                room = client.room_name(world_id, location) if location else None
+
+                # Logique d'insertion/mise à jour similaire à add_world de update_db.py
+                # mais directement ici avec le curseur actuel.
+                cursor.execute(
+                    "SELECT location, room FROM worlds WHERE username = ? AND world_ID = ?",
+                    (user, world_id),
+                )
+                existing_entry = cursor.fetchone()
+
+                current_time_iso = datetime.datetime.now().isoformat()
+
+                if existing_entry:
+                    # Convert row to dict if row_factory was used, otherwise access by index
+                    current_location = (
+                        existing_entry["location"]
+                        if isinstance(existing_entry, sqlite3.Row)
+                        else existing_entry[0]
+                    )
+                    current_room = (
+                        existing_entry["room"]
+                        if isinstance(existing_entry, sqlite3.Row)
+                        else existing_entry[1]
+                    )
+
+                    if location != current_location or room != current_room:
+                        cursor.execute(
+                            """
+                            UPDATE worlds
+                            SET location = ?, room = ?, created_at = ?
+                            WHERE username = ? AND world_ID = ?
+                            """,
+                            (location, room, current_time_iso, user, world_id),
+                        )
+                        updated_entries += 1
+                    # else: # Entry exists and is identical, do nothing
+                    # pass
+                else:
+                    # Insert new entry
+                    cursor.execute(
+                        """
+                        INSERT INTO worlds (username, world_ID, location, room, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (user, world_id, location, room, current_time_iso),
+                    )
+                    added_entries += 1
+
+                db.commit()  # Commit après chaque ajout/màj réussie ou à la fin
+                processed_worlds += 1
+
+            except (
+                ValueError,
+                OpensslError,
+                ConnectionError,
+                RuntimeError,
+                TypeError,
+                KeyError,
+            ) as api_err:
+                print(
+                    f"Erreur API Kerberos pour monde {world_id} (User: {user}): {type(api_err).__name__} - {api_err}"
+                )
+                error_count += 1
+                db.rollback()  # Annule la transaction pour ce monde si erreur API/DB
+                continue  # Passe au monde suivant
+            except sqlite3.Error as db_err:
+                print(f"Erreur DB pour monde {world_id} (User: {user}): {db_err}")
+                error_count += 1
+                db.rollback()  # Annule la transaction pour ce monde
+                continue  # Passe au monde suivant
+
+        # Fin de la boucle
+        # Commit final (au cas où le dernier commit dans la boucle n'a pas été fait)
+        db.commit()
+
+        summary = (
+            f"MAJ Positions terminée.\n"
+            f"Mondes traités: {processed_worlds}\n"
+            f"Mondes sans user/skippés: {skipped_worlds}\n"
+            f"Entrées MàJ: {updated_entries}\n"
+            f"Entrées Ajoutées: {added_entries}\n"
+            f"Erreurs rencontrées: {error_count}"
+        )
+        print(summary)
+        return jsonify({"success": True, "message": summary})
+
+    except Exception as e:
+        # Erreur générale (ex: connexion Kerberos initiale, liste des mondes impossible...)
+        error_msg = f"Erreur générale lors de la mise à jour des positions: {type(e).__name__} - {e}"
+        print(error_msg)
+        import traceback
+
+        traceback.print_exc()
+        # Assurer un rollback en cas d'erreur générale avant la boucle ou pendant l'init
+        try:
+            get_db().rollback()
+        except Exception as rollback_err:
+            print(f"Erreur lors du rollback général: {rollback_err}")
+
+        return jsonify({"success": False, "error": error_msg}), 500
+    # finally: # La connexion DB est gérée par le contexte Flask (@teardown_appcontext)
+    #     pass
+
+
 # --- SANDBOX Definitions ---
-# ... (code METHOD_PARAMETERS inchangé) ...
+
+# {
+#     "doc": "Log the thoughts of the protagonist for posterity (and data mining).",
+#     "kerberized": true,
+#     "restricted": false,
+#     "signature": "(world_id: str, thought: str)",
+# }
+
 METHOD_PARAMETERS = {
+    "protagonist.think": [
+        {
+            "name": "world_id",
+            "type": "string",
+            "required": True,
+            "description": "Identifiant du monde",
+        },
+        {
+            "name": "thought",
+            "type": "string",
+            "required": True,
+            "description": "Pensée du joueur",
+        },
+    ],
     "man": [
         {
             "name": "method",
@@ -617,6 +779,20 @@ METHOD_PARAMETERS = {
             "type": "list[string]",
             "required": True,
             "description": 'Liste de textes chiffrés (entrer comme JSON: ["c1", "c2"]).',
+        },
+    ],
+    "chip.whisperer-pro": [
+        {
+            "name": "world_id",
+            "type": "string",
+            "required": True,
+            "description": "ID du monde.",
+        },
+        {
+            "name": "ciphertext",
+            "type": "string",
+            "required": True,
+            "description": "ciphertext to study",
         },
     ],
     "walkman.get-tracks": [

@@ -135,35 +135,47 @@ DEFAULT_USERNAME = "mbidault"
 dotenv.load_dotenv()
 DEFAULT_PWD = os.getenv("DEFAULT_PWD")
 
+RESTRICTED_METHODS = [
+    "session-store.get",
+]
+
 KERBERIZED_METHODS = [
-    "world.create",
+    "item.move",
     "kerberos.echo",
     "protagonist.move",
-    "item.move",
+    "protagonist.think",
     "room.neighbor",
+    "world.create",
 ]
 
 NON_KERBERIZED_METHODS = [
-    "man",
+    "action.do",
+    "action.is_done",
+    "chip.whisperer",
+    "chip.whisperer-pro",
     "echo",
-    "world.list",
-    "world.destroy",
-    "server.status",
-    "server.history",
+    "item.description",
+    "item.gender",
+    "item.location",
+    "item.matches",
+    "item.title",
     "kerberos.authentication-service",
     "kerberos.ticket-granting-service",
-    "protagonist.location",
+    "man",
     "protagonist.data-collection",
+    "protagonist.location",
+    "protagonist.sessions",
     "protagonist.username",
-    "room.name",
+    "room.description",
     "room.find-by-name",
-    "chip.whisperer",
-    "walkman.get-tracks",
-    "action.is_done",
-    "action.do",
     "room.items",
-    "item.description",
-    "item.location",
+    "room.name",
+    "server.history",
+    "server.status",
+    "session-store.set",
+    "walkman.get-tracks",
+    "world.destroy",
+    "world.list",
 ]
 
 
@@ -296,18 +308,16 @@ class KerberosClient:
     def data_collection(self, world_id):
         return self.call_method("protagonist.data-collection", world_id=world_id)
 
-    def use_from_world(self, world_id):
+    def user_from_world(self, world_id):
         return self.call_method("protagonist.username", world_id=world_id)
 
     def room_name(self, world_id, room):
         return self.call_method("room.name", world_id=world_id, room=room)
 
+    # {'signature': '(world_id: str, room: str, direction: str) -> Optional[str]', 'doc': 'Return the room reachable by moving in "direction" from the given room.\nReturn None if it is impossible to do this move.', 'kerberized': True, 'restricted': False}
     def room_neighbor(self, world_id, room, direction):
         return self.call_method(
-            "room.neighbor",
-            world_id=world_id,
-            room=room,
-            direction=direction,
+            "room.neighbor", world_id=world_id, room=room, direction=direction
         )
 
     def chip_whisperer(self, world_id, ciphertexts):
@@ -321,12 +331,20 @@ class KerberosClient:
     def is_action_done(self, world_id, name):
         return self.call_method("action.is_done", world_id=world_id, name=name)
 
+    def get_world_of(self, username):
+        worlds = self.list_worlds()
+        result = []
+        for w in worlds:
+            if self.user_from_world(w[0]) == username:
+                result.append(w[0])
+        return result
+
 
 def scan_users(client: KerberosClient, verbose=1):
     world_list = client.list_worlds()
     result = []
     for w in world_list:
-        user = client.use_from_world(w[0])
+        user = client.user_from_world(w[0])
         if user:
             result.append((user, w[0]))
             if verbose > 0:
@@ -350,7 +368,7 @@ def all_man(client: KerberosClient, verbose=1):
 # jprint(K_CLIENT.man("protagonist.username"))
 
 
-# jprint(K_CLIENT.use_from_world("c89e87be37e427e86e9720fc6329bd6f"))
+# jprint(K_CLIENT.user_from_world("c89e87be37e427e86e9720fc6329bd6f"))
 # all_man(K_CLIENT)
 if __name__ == "__main__":
     K_CLIENT = KerberosClient()

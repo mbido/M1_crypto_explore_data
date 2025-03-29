@@ -243,7 +243,7 @@ def scan_active_users(client: KerberosClient, protected=False):
         # print(f"Traitement monde {count}/{len(world_list)} : {w_ID}")
         user = None  # Initialiser pour le bloc except
         try:
-            user = client.use_from_world(w_ID)
+            user = client.user_from_world(w_ID)
             if not user:
                 # print(f"  -> Aucun utilisateur trouvé pour {w_ID}, skip.")
                 continue
@@ -308,7 +308,7 @@ def scan_active_users(client: KerberosClient, protected=False):
             # Ajoute toujours la ligne utilisateur, même si certains détails sont None
             user_db_lines.append(
                 {
-                    "username": user,  # Username principal vient de use_from_world
+                    "username": user,  # Username principal vient de user_from_world
                     "first_name": first_name,
                     "last_name": last_name,
                     "email": email,  # Email récupéré plus haut
