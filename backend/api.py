@@ -95,8 +95,77 @@ def query_db(query, args=(), one=False):
         return None
 
 
-# --- Standard API Routes (/api/stats, /api/users, /api/user/<username>, /api/compare) ---
-# ... (code inchangé) ...
+@app.route("/api/world/<world_id>/live_location", methods=["GET"])
+def get_live_location(world_id):
+    """
+    Tente de récupérer la localisation actuelle d'un monde actif.
+    Ne modifie pas la base de données.
+    """
+    if not world_id:
+        return jsonify({"success": False, "error": "World ID manquant"}), 400
+
+    print(f"Tentative de récupération de la position live pour le monde: {world_id}")
+    try:
+        client = KerberosClient()  # Instancie le client (gère l'authentification)
+
+        # Tenter de récupérer la localisation. Ceci échouera si le monde est inactif.
+        location = client.location(world_id=world_id)
+        room = None
+        if location:
+            # Si la localisation est obtenue, essayer d'obtenir le nom de la salle
+            try:
+                room = client.room_name(world_id=world_id, room=location)
+            except Exception as room_name_error:
+                print(
+                    f"Avertissement: Impossible d'obtenir le nom de la salle pour {location} dans {world_id}: {room_name_error}"
+                )
+                room = "Erreur nom salle"  # Ou None, ou location elle-même
+
+        # Obtenir le timestamp actuel pour indiquer quand la vérification a été faite
+        current_timestamp = datetime.datetime.now().isoformat()
+
+        print(
+            f"Position live trouvée pour {world_id}: Location={location}, Room={room}"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "location": location,
+                "room": room,
+                "checked_at": current_timestamp,
+            }
+        )
+
+    except (
+        ValueError,
+        OpensslError,
+        ConnectionError,
+        RuntimeError,
+        TypeError,
+        KeyError,
+    ) as e:
+        # Intercepter les erreurs spécifiques du client Kerberos ou de l'API
+        error_message = f"Monde inactif ou erreur API: {type(e).__name__}"
+        print(f"Erreur live location pour {world_id}: {error_message} - Détails: {e}")
+        # Retourner explicitement que le monde n'est pas actif ou qu'il y a eu une erreur
+        return (
+            jsonify({"success": False, "error": error_message, "details": str(e)}),
+            404,
+        )  # 404 Not Found est approprié si le monde n'est pas actif/trouvé
+
+    except Exception as e:
+        # Erreur générique inattendue
+        error_message = f"Erreur serveur inattendue: {type(e).__name__}"
+        print(
+            f"Erreur serveur live location pour {world_id}: {error_message} - Détails: {e}"
+        )
+        import traceback
+
+        traceback.print_exc()
+        return (
+            jsonify({"success": False, "error": error_message, "details": str(e)}),
+            500,
+        )
 
 
 @app.route("/api/stats")
@@ -514,14 +583,22 @@ def trigger_worlds_update():
 
 # --- SANDBOX Definitions ---
 
-# {
-#     "doc": "Log the thoughts of the protagonist for posterity (and data mining).",
-#     "kerberized": true,
-#     "restricted": false,
-#     "signature": "(world_id: str, thought: str)",
-# }
 
 METHOD_PARAMETERS = {
+    "room.directions": [
+        {
+            "name": "world_id",
+            "type": "string",
+            "required": True,
+            "description": "Identifiant du monde",
+        },
+        {
+            "name": "room",
+            "type": "string",
+            "required": True,
+            "description": "Identifiant de la salle",
+        },
+    ],
     "protagonist.think": [
         {
             "name": "world_id",
