@@ -1232,6 +1232,16 @@ document
               return;
             }
 
+            rooms.sort((a, b) => {
+              // Utilise le nom s'il existe, sinon l'ID, pour le tri
+              const nameA = (a.name || a.id ||
+                             '').toLowerCase();  // || '' pour éviter erreur si
+                                                 // null/undefined
+              const nameB = (b.name || b.id || '').toLowerCase();
+              return nameA.localeCompare(
+                  nameB);  // Tri alphabétique insensible à la casse
+            });
+
             statusDiv.innerHTML =
                 `<div class="status-message status-info">Cliquez sur une salle pour vous y téléporter. (${
                     rooms.length} trouvées)</div>`;
