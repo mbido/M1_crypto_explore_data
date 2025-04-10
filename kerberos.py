@@ -131,9 +131,10 @@ def decrypt(cryptedtext, passphrase, cipher="aes-128-cbc"):
 
 API_URL = "http://m1.tme-crypto.fr:8888/"
 HEADERS = {"Content-Type": "application/json"}
-DEFAULT_USERNAME = "mbidault"
+
 dotenv.load_dotenv()
 DEFAULT_PWD = os.getenv("DEFAULT_PWD")
+DEFAULT_USERNAME = os.getenv("DEFAULT_USERNAME")
 
 RESTRICTED_METHODS = [
     "session-store.get",

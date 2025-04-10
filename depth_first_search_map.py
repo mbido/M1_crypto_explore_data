@@ -326,48 +326,12 @@ def get_all_rooms(
 
 
 if __name__ == "__main__":
-    try:
-        client = KerberosClient()
-        # Choisissez un world_id actif pour construire/tester
-        world_for_graph_build = (
-            "ed28bf52fd0b6bc2178cb9ae81c199c9"  # Mettez un ID valide et actif
-        )
+    client = KerberosClient()
+    # Choisissez un world_id actif pour construire/tester
+    world_for_graph_build = "v"  # Mettez un ID valide et actif
 
-        # --- Étape 1: Construire le graphe optimisé ---
-        print("Building graph...")
-        # Cette fonction affiche maintenant ses propres compteurs d'API
-        optimized_graph = build_name_graph(client, world_for_graph_build)
-
-        # Optionnel : Afficher ou sauvegarder le graphe construit
-        # print("\nBuilt Graph Structure:")
-        # jprint(optimized_graph)
-        # print(f"\nTotal unique rooms (nodes) in built graph: {len(optimized_graph)}")
-        # Sauvegarde (exemple):
-        # with open("optimized_name_graph.json", "w", encoding="utf-8") as f:
-        #     json.dump(optimized_graph, f, indent=2, ensure_ascii=False)
-        # print("Graph saved to optimized_name_graph.json")
-
-        # --- Étape 2: Utiliser le graphe pour explorer ---
-        # Assurez-vous que get_all_rooms utilise le bon graphe.
-        # Vous pouvez soit remplacer NAME_GRAPH dans maps.py, soit passer le graphe directement.
-
-        print("\n---------------------\n")
-        print("Running optimized discovery using the built graph...")
-        world_to_explore = world_for_graph_build  # Explorer le même monde pour tester
-
-        # Utiliser le graphe fraîchement construit:
-        rooms = get_all_rooms(client, world_to_explore, name_graph=optimized_graph)
-
-        # Ou si vous avez mis à jour NAME_GRAPH dans maps.py ou en haut de ce fichier:
-        # NAME_GRAPH = optimized_graph # Met à jour la variable globale si besoin
-        # rooms = get_all_rooms(client, world_to_explore) # Utilise NAME_GRAPH
-
-        # Afficher un résumé des résultats de la découverte
-        # print("\nRooms found by get_all_rooms:")
-        # jprint(rooms) # Peut être très long
-        print(f"\nTotal room entries found by get_all_rooms: {len(rooms)}")
-        # Comparer les compteurs d'API entre build_name_graph et get_all_rooms
-
-    except Exception as main_err:
-        print(f"\nAn error occurred in the main execution block: {main_err}")
-        traceback.print_exc()
+    # --- Étape 1: Construire le graphe optimisé ---
+    print("Building graph...")
+    # Cette fonction affiche maintenant ses propres compteurs d'API
+    optimized_graph = build_name_graph(client, world_for_graph_build)
+    jprint(optimized_graph)
